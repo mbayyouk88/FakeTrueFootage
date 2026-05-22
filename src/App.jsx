@@ -1,6 +1,8 @@
 // ─── UAD 3.6 Dynamic URAR – True Footage Embedded Report ───────────────────
 // All 29 URAR sections; conditional sections appear based on property data.
 
+export default App;
+
 const SECTIONS = [
   { id: 'summary',        label: 'Summary',                     mandatory: true  },
   { id: 'assignment',     label: 'Assignment Information',       mandatory: true  },
