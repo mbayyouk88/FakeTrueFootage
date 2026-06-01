@@ -7,1097 +7,1299 @@ import React, { useState, useEffect, useRef } from 'react';
 export default App;
 
 
-const SECTIONS = [
-  { id: 'summary',        label: 'Summary',                     mandatory: true  },
-  { id: 'assignment',     label: 'Assignment Information',       mandatory: true  },
-  { id: 'subject',        label: 'Subject Property',             mandatory: true  },
-  { id: 'site',           label: 'Site',                         mandatory: true  },
-  { id: 'dwelling_ext',   label: 'Dwelling Exterior',            mandatory: true  },
-  { id: 'unit_interior',  label: 'Unit Interior',                mandatory: true  },
-  { id: 'quality',        label: 'Overall Quality & Condition',  mandatory: true  },
-  { id: 'amenities',      label: 'Subject Property Amenities',   mandatory: false, trigger: 'hasAmenities'    },
-  { id: 'vehicle',        label: 'Vehicle Storage',              mandatory: false, trigger: 'hasVehicle'      },
-  { id: 'functional',     label: 'Functional Obsolescence',      mandatory: false, trigger: 'hasFunctional'   },
-  { id: 'outbuilding',    label: 'Outbuilding',                  mandatory: false, trigger: 'hasOutbuilding'  },
-  { id: 'energy',         label: 'Energy Efficient & Green',     mandatory: false, trigger: 'hasEnergy'       },
-  { id: 'project',        label: 'Project Information',          mandatory: false, trigger: 'isCondo'         },
-  { id: 'mfg',            label: 'Manufactured Home',            mandatory: false, trigger: 'isMfg'           },
-  { id: 'disaster',       label: 'Disaster Mitigation',          mandatory: false, trigger: 'hasDisaster'     },
-  { id: 'adu',            label: 'Accessory Dwelling Unit',      mandatory: false, trigger: 'hasADU'          },
-  { id: 'listing',        label: 'Subject Listing Information',  mandatory: true  },
-  { id: 'prior',          label: 'Prior Sale & Transfer History',mandatory: true  },
-  { id: 'market',         label: 'Market Conditions',            mandatory: true  },
-  { id: 'hbu',            label: 'Highest & Best Use',           mandatory: true  },
-  { id: 'sales_comp',     label: 'Sales Comparison Approach',    mandatory: true  },
-  { id: 'cost',           label: 'Cost Approach',                mandatory: false, trigger: 'hasCost'         },
-  { id: 'income',         label: 'Income Approach',              mandatory: false, trigger: 'hasIncome'       },
-  { id: 'rental',         label: 'Rental Information',           mandatory: false, trigger: 'hasRental'       },
-  { id: 'reconciliation', label: 'Reconciliation',               mandatory: true  },
-  { id: 'certification',  label: 'Certification & Scope',        mandatory: true  },
-];
-
-const FL = ({ label, children, note, conditional }) => (
-  <div style={{ marginBottom: 14 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block' }}>{label}</label>
-      {conditional && <span style={{ fontSize: 9, background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: 4, fontWeight: 600 }}>DYNAMIC</span>}
-      {note && <span style={{ fontSize: 9, color: '#94a3b8' }}>{note}</span>}
-    </div>
-    {children}
-  </div>
+// ── Shared UI primitives ──────────────────────────────────────────────────────
+const Input = ({ val, onChange, placeholder, type = 'text', cls = '' }) => (
+  <input type={type} placeholder={placeholder}
+    className={`w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${cls}`}
+    value={val || ''} onChange={e => onChange(e.target.value)} />
 );
 
-const Input = ({ placeholder, value, onChange, type = 'text', width }) => (
-  <input type={type} value={value} onChange={onChange} placeholder={placeholder}
-    style={{ width: width || '100%', border: '1px solid #e2e8f0', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: '#1e293b', background: 'white', boxSizing: 'border-box' }} />
-);
-
-const Select = ({ value, onChange, options }) => (
-  <select value={value} onChange={onChange}
-    style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: '#1e293b', background: 'white' }}>
-    {options.map(o => typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.v} value={o.v}>{o.l}</option>)}
+const Sel = ({ val, onChange, opts, placeholder }) => (
+  <select className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+    value={val || ''} onChange={e => onChange(e.target.value)}>
+    {placeholder && <option value="">{placeholder}</option>}
+    {opts.map(o => <option key={o.v ?? o} value={o.v ?? o}>{o.l ?? o}</option>)}
   </select>
 );
 
-const Textarea = ({ placeholder, rows = 3 }) => (
-  <textarea placeholder={placeholder} rows={rows}
-    style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 12, color: '#1e293b', resize: 'vertical', boxSizing: 'border-box' }} />
+const Textarea = ({ val, onChange, rows = 3, placeholder }) => (
+  <textarea rows={rows} placeholder={placeholder}
+    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 resize-y"
+    value={val || ''} onChange={e => onChange(e.target.value)} />
 );
 
-const Row = ({ children, cols = 2 }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 12 }}>{children}</div>
-);
-
-const SectionCard = ({ title, children, badge }) => (
-  <div style={{ marginBottom: 20 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 8, borderBottom: '2px solid #e2e8f0' }}>
-      <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{title}</span>
-      {badge && <span style={{ fontSize: 9, background: '#dbeafe', color: '#1d4ed8', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>{badge}</span>}
+const Toggle = ({ on, onChange, label }) => (
+  <label className="flex items-center gap-2 cursor-pointer select-none">
+    <div onClick={() => onChange(!on)}
+      className={`w-10 h-5 rounded-full relative transition-colors ${on ? 'bg-blue-600' : 'bg-gray-300'}`}>
+      <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform shadow ${on ? 'translate-x-5' : 'translate-x-0.5'}`} />
     </div>
-    {children}
-  </div>
-);
-
-const Divider = () => <div style={{ height: 1, background: '#f1f5f9', margin: '14px 0' }} />;
-
-const CheckRow = ({ label, checked, onChange }) => (
-  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: '#374151', marginBottom: 6 }}>
-    <input type="checkbox" checked={checked} onChange={onChange} style={{ accentColor: '#2563eb', width: 14, height: 14 }} />
-    {label}
+    <span className="text-sm text-gray-700">{label}</span>
   </label>
 );
 
-const DynamicBanner = ({ label }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 12px', marginBottom: 16 }}>
-    <span style={{ fontSize: 14 }}>⚡</span>
-    <span style={{ fontSize: 11, color: '#92400e', fontWeight: 600 }}>Dynamic Section — appeared because: <em>{label}</em></span>
+const F = ({ label, req, hint, children }) => (
+  <div className="mb-3">
+    <label className="block text-xs font-semibold text-gray-600 mb-1">
+      {label}{req && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
+    {children}
+    {hint && <p className="text-xs text-amber-600 mt-0.5">⚡ {hint}</p>}
   </div>
 );
 
-const CompGrid = ({ idx }) => {
-  const labels = [
-    'Sale Price', 'Sale Date', 'Data Source / Verification',
-    'Location', 'Site', 'GLA (sf)', 'Room Count', 'Bedrooms', 'Bathrooms',
-    'Basement & Finish', 'Functional Utility', 'Heating / Cooling',
-    'Energy Efficient Items', 'Vehicle Storage', 'Porch / Patio / Deck',
-    'Fireplace(s)', 'Other Amenities', 'Custom Line 1', 'Custom Line 2', 'Custom Line 3',
-  ];
-  return (
-    <div>
-      <div style={{ fontWeight: 700, fontSize: 12, color: '#2563eb', marginBottom: 8 }}>Comparable {idx + 1}</div>
-      <FL label="Address"><Input placeholder="Street, City, State ZIP" /></FL>
-      <FL label="Proximity to Subject"><Input placeholder="e.g. 0.32 miles NE" /></FL>
-      <FL label="Sale Price / GLA Price"><Row cols={2}><Input placeholder="$000,000" /><Input placeholder="$/sf" /></Row></FL>
-      <FL label="Proximity / Data / Verification Source"><Row cols={2}><Input placeholder="MLS #" /><Input placeholder="DOM" /></Row></FL>
-      {labels.map(l => (
-        <div key={l} style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-          <Input placeholder={l} />
-          <Input placeholder="Adj $" />
-        </div>
-      ))}
-      <div style={{ display: 'flex', justifyContent: 'space-between', background: '#f8fafc', padding: '8px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, marginTop: 8 }}>
-        <span>Net Adj / Gross Adj</span>
-        <span style={{ color: '#2563eb' }}>+$0 / $0</span>
-      </div>
-      <FL label="Adjusted Sale Price"><Input placeholder="$000,000" /></FL>
-    </div>
-  );
+const G2 = ({ children }) => <div className="grid grid-cols-2 gap-3">{children}</div>;
+const G3 = ({ children }) => <div className="grid grid-cols-3 gap-3">{children}</div>;
+
+const Tag = ({ color, children }) => {
+  const c = color === 'green' ? 'bg-green-100 text-green-700' :
+            color === 'amber' ? 'bg-amber-100 text-amber-700' :
+            color === 'red'   ? 'bg-red-100 text-red-700'     : 'bg-blue-100 text-blue-700';
+  return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${c}`}>{children}</span>;
 };
 
+const SectionHeader = ({ num, title, mandatory, badge }) => (
+  <div className="flex items-center gap-2 mb-5 pb-3 border-b border-gray-200">
+    <span className="text-xs font-mono bg-gray-800 text-white px-2 py-0.5 rounded">{num}</span>
+    <h2 className="text-base font-bold text-gray-800 flex-1">{title}</h2>
+    {mandatory ? <Tag color="green">Mandatory</Tag> : <Tag color="amber">Conditional</Tag>}
+    {badge && <Tag color="blue">{badge}</Tag>}
+  </div>
+);
+
+const ConditionalBanner = ({ text }) => (
+  <div className="bg-amber-50 border border-amber-200 rounded p-2 mb-4 text-xs text-amber-700 flex items-center gap-2">
+    <span>⚡</span> {text}
+  </div>
+);
+
+// ── Main App ──────────────────────────────────────────────────────────────────
 function App() {
-  const [activeSection, setActiveSection] = React.useState('summary');
-  const [navOpen, setNavOpen] = React.useState(true);
+  const [f, setF] = useState({
+    // Assignment-level triggers
+    propertyType: 'SFR',
+    assignmentType: 'Refinance',
+    valuationMethod: 'Traditional',
 
-  // Conditional triggers
-  const [propType,       setPropType]       = React.useState('Single Family');
-  const [constrMethod,   setConstrMethod]   = React.useState('Site Built');
-  const [hasADU,         setHasADU]         = React.useState(false);
-  const [hasOutbuilding, setHasOutbuilding] = React.useState(false);
-  const [hasEnergy,      setHasEnergy]      = React.useState(false);
-  const [hasFunctional,  setHasFunctional]  = React.useState(false);
-  const [hasVehicle,     setHasVehicle]     = React.useState(true);
-  const [hasAmenities,   setHasAmenities]   = React.useState(true);
-  const [hasCost,        setHasCost]        = React.useState(false);
-  const [hasIncome,      setHasIncome]      = React.useState(false);
-  const [hasRental,      setHasRental]      = React.useState(false);
-  const [hasDisaster,    setHasDisaster]    = React.useState(false);
+    // Subject
+    address: '', city: '', state: '', zip: '', county: '',
+    legalDesc: '', apn: '', taxYear: '', reTaxes: '', specialAssess: '',
+    occupancy: 'Owner',
 
-  // Quality/Condition
-  const [extQ, setExtQ] = React.useState('Q4');
-  const [intQ, setIntQ] = React.useState('Q4');
-  const [ovQ,  setOvQ]  = React.useState('Q4');
-  const [extC, setExtC] = React.useState('C3');
-  const [intC, setIntC] = React.useState('C3');
-  const [ovC,  setOvC]  = React.useState('C3');
-  const [updateLevel, setUpdateLevel] = React.useState('Updated');
+    // Site
+    siteArea: '', siteUnit: 'sq ft', siteShape: '', zoning: '', zoningDesc: '',
+    zoningCompliance: 'Legal', utilities: '', streetType: 'Public',
+    streetSurface: 'Paved', alley: 'None',
+    hasWaterFrontage: false, waterFrontageType: '', waterFrontagePrivate: false,
+    siteTopography: '', siteSize: '', siteInfluences: '',
 
-  const [savedToast, setSavedToast] = React.useState(false);
+    // Dwelling Exterior
+    yearBuilt: '', effectiveAge: '', stories: '',
+    designStyle: '', foundationType: '', exteriorWalls: '',
+    roofSurface: '', roofType: '', gutters: false,
+    windowType: '', stormSash: false, screens: false,
+    manufacturingMethod: 'Site-Built',
 
-  const isCondo = propType === 'Condominium';
-  const isMfg   = constrMethod === 'Manufactured';
+    // Unit Interior
+    floors: '', walls: '', trimFinish: '',
+    bathWainscot: '', bathFloor: '',
+    heatingType: '', heatingFuel: '', coolingType: '',
+    amenitiesFireplace: '', amenitiesFireplaceCount: '',
+    gla: '', glaBelowGrade: '', belowGradeFinished: '',
+    bedrooms: '', bathrooms: '', halfBaths: '',
 
-  const triggers = { hasADU, hasOutbuilding, hasEnergy, hasFunctional, hasVehicle, hasAmenities, hasCost, hasIncome, hasRental, hasDisaster, isCondo, isMfg };
+    // Quality & Condition
+    qualityRating: '',
+    conditionRating: '',
+    defects: '', physicalDeficiencies: '', adverseEnvConditions: '',
+    kitchenUpdate: '', bathUpdate: '', otherUpdate: '', updateTimeframe: '',
 
-  const visibleSections = SECTIONS.filter(s => s.mandatory || triggers[s.trigger]);
+    // View
+    viewRating: '', viewFactors: [],
 
-  const qOpts = ['Q1','Q2','Q3','Q4','Q5','Q6'].map(v => ({ v, l: `${v} – ${['Highest quality, custom design','Superior craftsmanship, high-grade materials','Improved design, quality materials','Standard quality, average workmanship','Basic finishes, modest construction','Lowest quality, bare essentials'][parseInt(v[1])-1]}` }));
-  const cOpts = ['C1','C2','C3','C4','C5','C6'].map(v => ({ v, l: `${v} – ${['New construction, never occupied','No deferred maintenance, minor wear','Well-maintained, limited updating needed','Some deferred maintenance, average wear','Significant deferred maintenance','Substantial damage, deferred maintenance'][parseInt(v[1])-1]}` }));
+    // Vehicle Storage
+    vehicleStorage: 'None', vehicleSpaces: '', vehicleSize: '',
+    vehicleCarport: false, vehicleAttached: false,
 
-  const save = () => { setSavedToast(true); setTimeout(() => setSavedToast(false), 2500); };
+    // Amenities
+    pool: false, spa: false, fence: false, patio: false, deck: false,
+    porch: false, shed: false,
 
-  // ── SECTION CONTENT ──────────────────────────────────────────────────────
-  const renderSection = (id) => {
-    switch(id) {
+    // Conditional sections
+    hasOutbuilding: false,
+    outbuildingType: '', outbuildingSize: '', outbuildingCondition: '',
 
-      case 'summary': return (
-        <div>
-          <SectionCard title="Report Summary" badge="MANDATORY">
-            <Row cols={3}>
-              <FL label="Report Type"><Select value="Traditional" onChange={()=>{}} options={['Traditional','Hybrid','Desktop']} /></FL>
-              <FL label="Form / Report Version"><Input placeholder="Dynamic URAR – UAD 3.6" /></FL>
-              <FL label="Effective Date"><Input type="date" placeholder="2026-05-20" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Date of Report"><Input type="date" /></FL>
-              <FL label="Report Reference #"><Input placeholder="TF-2240" /></FL>
-            </Row>
-          </SectionCard>
-          <SectionCard title="Appraiser Information">
-            <Row cols={2}>
-              <FL label="Appraiser Name"><Input placeholder="Full legal name" /></FL>
-              <FL label="Co-Appraiser / Trainee"><Input placeholder="If applicable" /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="License Type"><Select value="Certified Residential" onChange={()=>{}} options={['Certified General','Certified Residential','Licensed','Trainee']} /></FL>
-              <FL label="License Number"><Input placeholder="CR-XXXXXXX" /></FL>
-              <FL label="License State"><Input placeholder="TX" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Supervisory Appraiser" note="(if applicable)"><Input placeholder="Name" /></FL>
-              <FL label="Supervisor License #"><Input placeholder="CR-XXXXXXX" /></FL>
-            </Row>
-          </SectionCard>
+    hasFunctionalObsolescence: false,
+    functionalObsDesc: '',
+
+    hasEnergyFeatures: false,
+    energySolar: false, energyGeothermal: false, energyWindTurbine: false,
+    energyOther: '', greenCertification: '',
+
+    isIncomeProducing: false,
+    monthlyRent: '', rentBasis: '', rentVacancy: '',
+
+    isDisasterArea: false, disasterType: '', disasterDesc: '',
+
+    showCostApproach: false,
+    siteValue: '', dwellingValue: '', depreciationAmt: '', depreciationPct: '',
+    improvementsAsIs: '', costAsIs: '',
+
+    hasADU: false,
+    aduType: '', aduGLA: '', aduBed: '', aduBath: '', aduRent: '',
+
+    hasProjectInfo: false, // driven by Condo
+    projectName: '', projectType: '', projectUnits: '', projectPhase: '',
+    hoaDues: '', hoaDuesFreq: '', hoaFeeIncludes: '',
+
+    // HBU
+    hbuVacant: '', hbuImproved: '',
+
+    // Market
+    neighborhoodBoundaries: '', neighborhoodDesc: '',
+    landUse1Unit: '', landUse24Unit: '', landUseCommercial: '', landUseOther: '',
+    propertyValues: '', demandSupply: '', marketingTime: '',
+    priceRangeLow: '', priceRangeHigh: '', priceRangePred: '',
+    ageLow: '', ageHigh: '', agePred: '',
+
+    // Listing
+    priorListings: 'None', listingDate: '', listingPrice: '', listingDays: '',
+
+    // Prior Sale
+    priorSale12: 'No', priorSale12Date: '', priorSale12Price: '',
+    priorSale36: 'No', priorSale36Date: '', priorSale36Price: '',
+
+    // Sales Contract
+    contractDate: '', contractPrice: '', concessions: '',
+    concessionType: '', financingType: '',
+
+    // Sales Comparison (3 comps)
+    comps: [
+      { address: '', prox: '', salePrice: '', salePriceGLA: '', dataSource: '', verSource: '',
+        saleDate: '', saleType: '', concessions: '', location: '', site: '', view: '',
+        designStyle: '', quality: '', age: '', condition: '', aboveGrade: '', gla: '',
+        basement: '', funcUtil: '', heatingCooling: '', garage: '', porch: '',
+        pool: '', netAdj: '', adjSalePrice: '' },
+      { address: '', prox: '', salePrice: '', salePriceGLA: '', dataSource: '', verSource: '',
+        saleDate: '', saleType: '', concessions: '', location: '', site: '', view: '',
+        designStyle: '', quality: '', age: '', condition: '', aboveGrade: '', gla: '',
+        basement: '', funcUtil: '', heatingCooling: '', garage: '', porch: '',
+        pool: '', netAdj: '', adjSalePrice: '' },
+      { address: '', prox: '', salePrice: '', salePriceGLA: '', dataSource: '', verSource: '',
+        saleDate: '', saleType: '', concessions: '', location: '', site: '', view: '',
+        designStyle: '', quality: '', age: '', condition: '', aboveGrade: '', gla: '',
+        basement: '', funcUtil: '', heatingCooling: '', garage: '', porch: '',
+        pool: '', netAdj: '', adjSalePrice: '' },
+    ],
+
+    // Income Approach
+    grossRentMultiplier: '', potentialGrossIncome: '', vacancyLoss: '',
+    effectiveGrossIncome: '', expenses: '', netOperatingIncome: '', capRate: '',
+    incomeApproachValue: '',
+
+    // Reconciliation
+    scaValue: '', costApproachValue: '', incomeValue: '', reconciledValue: '',
+    reconciledValueFormatted: '',
+    exposureTime: '', marketingTimeFinal: '',
+    reconCommentary: '',
+
+    // Scope / Cert
+    inspectionType: 'Interior and Exterior',
+    appraiserName: '', appraiserLicense: '', appraiserState: '',
+    supervisoryName: '', supervisoryLicense: '',
+    effectiveDate: '', signatureDate: '',
+  });
+
+  const [activeSection, setActiveSection] = useState('01');
+  const [toast, setToast] = useState('');
+
+  const u = (field, value) => setF(prev => ({ ...prev, [field]: value }));
+  const uComp = (idx, field, value) => setF(prev => {
+    const comps = [...prev.comps];
+    comps[idx] = { ...comps[idx], [field]: value };
+    return { ...prev, comps };
+  });
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
+
+  const toggleViewFactor = (factor) => {
+    const cur = f.viewFactors;
+    if (cur.includes(factor)) { u('viewFactors', cur.filter(x => x !== factor)); }
+    else if (cur.length < 2) { u('viewFactors', [...cur, factor]); }
+    else { showToast('UAD 3.6: Maximum 2 view factors allowed per field.'); }
+  };
+
+  // ── Derived conditionals ──────────────────────────────────────────────────
+  const isCondo = f.propertyType === 'Condo';
+  const isMH = f.propertyType === 'MH';
+  const is24Unit = f.propertyType === '2-4 Unit';
+  const isPurchase = f.assignmentType === 'Purchase';
+  const isDesktop = f.valuationMethod === 'Desktop';
+  const isHybrid = f.valuationMethod === 'Hybrid';
+  const hasVehicleDetails = f.vehicleStorage !== 'None' && f.vehicleStorage !== '';
+  const showDefects = ['C5', 'C6'].includes(f.conditionRating);
+  const showIncomeApproach = f.isIncomeProducing || is24Unit;
+
+  // Auto-sync Condo → Project Info
+  useEffect(() => { if (isCondo) u('hasProjectInfo', true); else u('hasProjectInfo', false); }, [f.propertyType]);
+
+  const sections = [
+    { id: '01', label: 'Summary',                   show: true },
+    { id: '02', label: 'Assignment Information',     show: true },
+    { id: '03', label: 'Subject Property',           show: true },
+    { id: '04', label: 'Sales Contract',             show: isPurchase },
+    { id: '05', label: 'Market',                     show: true },
+    { id: '06', label: 'Site',                       show: true },
+    { id: '07', label: 'Dwelling Exterior',          show: true },
+    { id: '08', label: 'Unit Interior',              show: true },
+    { id: '09', label: 'Vehicle Storage',            show: hasVehicleDetails },
+    { id: '10', label: 'Subject Amenities',          show: true },
+    { id: '11', label: 'Quality & Condition',        show: true },
+    { id: '12', label: 'Outbuilding',                show: f.hasOutbuilding },
+    { id: '13', label: 'Functional Obsolescence',    show: f.hasFunctionalObsolescence },
+    { id: '14', label: 'Energy & Green Features',    show: f.hasEnergyFeatures },
+    { id: '15', label: 'Manufactured Home',          show: isMH },
+    { id: '16', label: 'Project Information',        show: f.hasProjectInfo },
+    { id: '17', label: 'ADU / Additional Unit',      show: f.hasADU },
+    { id: '18', label: 'Highest & Best Use',         show: true },
+    { id: '19', label: 'Subject Listing Info',       show: true },
+    { id: '20', label: 'Prior Sale & Transfer',      show: true },
+    { id: '21', label: 'Sales Comparison Approach',  show: true },
+    { id: '22', label: 'Rental Information',         show: f.isIncomeProducing },
+    { id: '23', label: 'Income Approach',            show: showIncomeApproach },
+    { id: '24', label: 'Cost Approach',              show: f.showCostApproach },
+    { id: '25', label: 'Disaster Mitigation',        show: f.isDisasterArea },
+    { id: '26', label: 'Reconciliation',             show: true },
+    { id: '27', label: 'Supplemental Information',   show: true },
+    { id: '28', label: 'Certification & Scope',      show: true },
+  ];
+
+  const visible = sections.filter(s => s.show);
+  useEffect(() => {
+    if (!visible.find(s => s.id === activeSection)) setActiveSection('01');
+  }, [f.propertyType, f.assignmentType, f.vehicleStorage, f.hasOutbuilding,
+      f.hasFunctionalObsolescence, f.hasEnergyFeatures, f.isIncomeProducing,
+      f.isDisasterArea, f.showCostApproach, f.hasADU, f.hasProjectInfo]);
+
+  // ── Section content renderers ────────────────────────────────────────────
+  const content = {
+
+    '01': () => (
+      <div>
+        <SectionHeader num="01" title="Summary" mandatory />
+        <p className="text-xs text-gray-500 mb-4">Core assignment triggers — changing these will show or hide entire sections of this report.</p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5">
+          <p className="text-xs font-bold text-blue-700 mb-3 uppercase tracking-wide">Assignment Triggers</p>
+          <G3>
+            <F label="Property Type" req>
+              <Sel val={f.propertyType} onChange={v => u('propertyType', v)}
+                opts={['SFR','Condo','2-4 Unit','MH']}
+                placeholder="Select" />
+              {isCondo && <p className="text-xs text-amber-600 mt-1">⚡ Project Information section added</p>}
+              {isMH    && <p className="text-xs text-amber-600 mt-1">⚡ Manufactured Home section added</p>}
+              {is24Unit && <p className="text-xs text-amber-600 mt-1">⚡ Income Approach section added</p>}
+            </F>
+            <F label="Assignment Type" req>
+              <Sel val={f.assignmentType} onChange={v => u('assignmentType', v)}
+                opts={['Refinance','Purchase','Other']}
+                placeholder="Select" />
+              {isPurchase && <p className="text-xs text-amber-600 mt-1">⚡ Sales Contract section added</p>}
+            </F>
+            <F label="Valuation Method" req>
+              <Sel val={f.valuationMethod} onChange={v => u('valuationMethod', v)}
+                opts={['Traditional','Hybrid','Desktop']}
+                placeholder="Select" />
+              {(isHybrid || isDesktop) && <p className="text-xs text-amber-600 mt-1">⚡ Adjusted scope of work fields</p>}
+            </F>
+          </G3>
         </div>
-      );
-
-      case 'assignment': return (
-        <div>
-          <SectionCard title="Assignment Information" badge="MANDATORY">
-            <Row cols={2}>
-              <FL label="Client Name"><Input placeholder="e.g. Westfield AMC" /></FL>
-              <FL label="Lender / Client Address"><Input placeholder="Street, City, State ZIP" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Intended Use"><Select value="Mortgage Finance" onChange={()=>{}} options={['Mortgage Finance','Refinance','HELOC','Estate','Relocation','Other']} /></FL>
-              <FL label="Intended Users"><Input placeholder="Lender/client and its successors" /></FL>
-            </Row>
-            <Divider />
-            <Row cols={2}>
-              <FL label="Property Rights Appraised">
-                <Select value="Fee Simple" onChange={()=>{}} options={['Fee Simple','Leasehold','Other']} />
-              </FL>
-              <FL label="Valuation Method">
-                <Select value={propType === 'Single Family' ? 'Traditional' : 'Traditional'} onChange={()=>{}} options={['Traditional','Hybrid','Desktop']} />
-              </FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Scope of Work"><Select value="Interior & Exterior" onChange={()=>{}} options={['Interior & Exterior','Exterior Only','Desktop – No Inspection']} /></FL>
-              <FL label="Extraordinary Assumptions"><Input placeholder="None identified" /></FL>
-            </Row>
-            <FL label="Hypothetical Conditions"><Textarea placeholder="None" rows={2} /></FL>
-            <FL label="Limiting Conditions"><Textarea placeholder="Standard limiting conditions apply per certification…" rows={3} /></FL>
-          </SectionCard>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <p className="text-xs font-bold text-gray-600 mb-3 uppercase tracking-wide">Conditional Section Toggles</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Toggle on={f.hasOutbuilding} onChange={v => u('hasOutbuilding', v)} label="Has Outbuilding" />
+            <Toggle on={f.hasFunctionalObsolescence} onChange={v => u('hasFunctionalObsolescence', v)} label="Functional Obsolescence" />
+            <Toggle on={f.hasEnergyFeatures} onChange={v => u('hasEnergyFeatures', v)} label="Energy / Green Features" />
+            <Toggle on={f.isIncomeProducing} onChange={v => u('isIncomeProducing', v)} label="Income Producing Property" />
+            <Toggle on={f.isDisasterArea} onChange={v => u('isDisasterArea', v)} label="Federal Disaster Area" />
+            <Toggle on={f.showCostApproach} onChange={v => u('showCostApproach', v)} label="Include Cost Approach" />
+            <Toggle on={f.hasADU} onChange={v => u('hasADU', v)} label="Has ADU / Additional Unit" />
+          </div>
         </div>
-      );
+        <div className="mt-4 bg-green-50 border border-green-200 rounded p-3">
+          <p className="text-xs font-semibold text-green-700 mb-1">Active Sections ({visible.length} of {sections.length})</p>
+          <p className="text-xs text-green-600">{visible.map(s => s.label).join(' · ')}</p>
+        </div>
+      </div>
+    ),
 
-      case 'subject': return (
-        <div>
-          <SectionCard title="Subject Property" badge="MANDATORY">
-            <FL label="Property Address (including Unit #)"><Input placeholder="4812 Ridgecrest Blvd, Austin, TX 78745" /></FL>
-            <Row cols={2}>
-              <FL label="Legal Description"><Input placeholder="Lot 7, Block 3, Ridgecrest Subdivision" /></FL>
-              <FL label="Assessor Parcel Number (APN)"><Input placeholder="000-000-000" /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="Tax Year"><Input placeholder="2025" /></FL>
-              <FL label="R.E. Taxes ($)"><Input placeholder="6,840" /></FL>
-              <FL label="Special Assessments"><Input placeholder="None" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Neighborhood Name"><Input placeholder="Ridgecrest Estates" /></FL>
-              <FL label="Census Tract"><Input placeholder="48453000100" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Map Reference"><Input placeholder="Grid A-7" /></FL>
-              <FL label="County"><Input placeholder="Travis" /></FL>
-            </Row>
-            <Divider />
-            <Row cols={3}>
-              <FL label="Occupant">
-                <Select value="Owner" onChange={()=>{}} options={['Owner','Tenant','Vacant']} />
-              </FL>
-              <FL label="HOA">
-                <Select value="No" onChange={()=>{}} options={['Yes','No']} />
-              </FL>
-              <FL label="HOA Fee ($/mo)"><Input placeholder="0" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Property Type">
-                <Select value={propType} onChange={e => setPropType(e.target.value)} options={['Single Family','Condominium','Cooperative','2-4 Unit','Manufactured Home']} />
-              </FL>
-              <FL label="Construction Method">
-                <Select value={constrMethod} onChange={e => setConstrMethod(e.target.value)} options={['Site Built','Modular','Manufactured']} />
-              </FL>
-            </Row>
-            <Divider />
-            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 10, fontSize: 11, color: '#0369a1' }}>
-              <strong>Dynamic triggers active:</strong> Selecting "Condominium" shows Project Information section. Selecting "Manufactured" shows Manufactured Home section. Enable the toggles in the left nav to reveal other conditional sections.
+    '02': () => (
+      <div>
+        <SectionHeader num="02" title="Assignment Information" mandatory badge={f.valuationMethod} />
+        {(isHybrid || isDesktop) && <ConditionalBanner text={`${f.valuationMethod} assignment — interior inspection scope is modified per UAD 3.6.`} />}
+        <G2>
+          <F label="Client / Lender" req><Input val={f.clientName} onChange={v => u('clientName', v)} /></F>
+          <F label="Intended User(s)"><Input val={f.intendedUsers} onChange={v => u('intendedUsers', v)} /></F>
+          <F label="Intended Use" req><Input val={f.intendedUse} onChange={v => u('intendedUse', v)} placeholder="Mortgage financing" /></F>
+          <F label="Effective Date of Appraisal" req><Input val={f.effectiveDate} onChange={v => u('effectiveDate', v)} type="date" /></F>
+          <F label="Property Rights Appraised" req>
+            <Sel val={f.propertyRights} onChange={v => u('propertyRights', v)}
+              opts={['Fee Simple','Leasehold','Leased Fee','Other']} placeholder="Select" />
+          </F>
+          <F label="Appraisal Purpose" req>
+            <Sel val={f.appraisalPurpose} onChange={v => u('appraisalPurpose', v)}
+              opts={['Market Value','As Repaired Value','As Completed Value','Liquidation Value']} placeholder="Select" />
+          </F>
+        </G2>
+        <F label="Scope of Work">
+          <Textarea val={f.scopeOfWork} onChange={v => u('scopeOfWork', v)}
+            placeholder={isDesktop ? 'Desktop: No physical inspection performed. Data sourced from...' : isHybrid ? 'Hybrid: Property data collected by a third-party PDC. Appraiser reviewed and analyzed...' : 'Traditional: Interior and exterior inspection performed by the appraiser on...'} />
+        </F>
+        <F label="Assumptions & Limiting Conditions">
+          <Textarea val={f.assumptions} onChange={v => u('assumptions', v)} rows={2} />
+        </F>
+      </div>
+    ),
+
+    '03': () => (
+      <div>
+        <SectionHeader num="03" title="Subject Property" mandatory />
+        <G2>
+          <F label="Street Address" req><Input val={f.address} onChange={v => u('address', v)} /></F>
+          <F label="Unit #"><Input val={f.unitNum} onChange={v => u('unitNum', v)} /></F>
+          <F label="City" req><Input val={f.city} onChange={v => u('city', v)} /></F>
+          <F label="State" req><Input val={f.state} onChange={v => u('state', v)} /></F>
+          <F label="ZIP Code" req><Input val={f.zip} onChange={v => u('zip', v)} /></F>
+          <F label="County" req><Input val={f.county} onChange={v => u('county', v)} /></F>
+        </G2>
+        <G3>
+          <F label="Legal Description"><Input val={f.legalDesc} onChange={v => u('legalDesc', v)} /></F>
+          <F label="Assessor Parcel #" req><Input val={f.apn} onChange={v => u('apn', v)} /></F>
+          <F label="Census Tract"><Input val={f.censusTract} onChange={v => u('censusTract', v)} /></F>
+          <F label="Map Reference"><Input val={f.mapRef} onChange={v => u('mapRef', v)} /></F>
+          <F label="Tax Year"><Input val={f.taxYear} onChange={v => u('taxYear', v)} /></F>
+          <F label="Real Estate Taxes ($)"><Input val={f.reTaxes} onChange={v => u('reTaxes', v)} type="number" /></F>
+        </G3>
+        <G3>
+          <F label="Special Assessments ($)"><Input val={f.specialAssess} onChange={v => u('specialAssess', v)} type="number" /></F>
+          <F label="Occupancy" req>
+            <Sel val={f.occupancy} onChange={v => u('occupancy', v)}
+              opts={['Owner','Tenant','Vacant']} placeholder="Select" />
+          </F>
+          <F label="HOA" hint={isCondo ? 'HOA details required for Condo' : ''}>
+            <Sel val={f.hoa} onChange={v => u('hoa', v)} opts={['Yes','No']} placeholder="Select" />
+          </F>
+        </G3>
+        {f.hoa === 'Yes' && (
+          <G3>
+            <F label="HOA Dues ($)" req><Input val={f.hoaDues} onChange={v => u('hoaDues', v)} type="number" /></F>
+            <F label="HOA Dues Frequency">
+              <Sel val={f.hoaFreq} onChange={v => u('hoaFreq', v)} opts={['Monthly','Quarterly','Annual']} placeholder="Select" />
+            </F>
+            <F label="HOA Fees Include"><Input val={f.hoaIncludes} onChange={v => u('hoaIncludes', v)} /></F>
+          </G3>
+        )}
+      </div>
+    ),
+
+    '04': () => (
+      <div>
+        <SectionHeader num="04" title="Sales Contract" badge="Purchase Only" />
+        <ConditionalBanner text="Purchase assignment detected — contract analysis and concession reporting required per UAD 3.6." />
+        <G2>
+          <F label="Contract Date" req><Input val={f.contractDate} onChange={v => u('contractDate', v)} type="date" /></F>
+          <F label="Contract Price ($)" req><Input val={f.contractPrice} onChange={v => u('contractPrice', v)} type="number" /></F>
+          <F label="Financing Type" req>
+            <Sel val={f.financingType} onChange={v => u('financingType', v)}
+              opts={['Conventional','FHA','VA','USDA','Cash','Other']} placeholder="Select" />
+          </F>
+          <F label="Sale/Concession Type" req>
+            <Sel val={f.saleType} onChange={v => u('saleType', v)}
+              opts={['ArmLth','REO','Short','Listing','Court','Relo','NonArmLth']} placeholder="Select" />
+          </F>
+        </G2>
+        <G2>
+          <F label="Seller Concessions ($)"><Input val={f.concessions} onChange={v => u('concessions', v)} type="number" /></F>
+          <F label="Concession Description"><Input val={f.concessionDesc} onChange={v => u('concessionDesc', v)} /></F>
+        </G2>
+        <F label="Contract Analysis Commentary" req>
+          <Textarea val={f.contractAnalysis} onChange={v => u('contractAnalysis', v)}
+            placeholder="Summarize results of contract analysis, or explain if contract was not made available..." />
+        </F>
+      </div>
+    ),
+
+    '05': () => (
+      <div>
+        <SectionHeader num="05" title="Market" mandatory />
+        <F label="Neighborhood Boundaries" req><Input val={f.neighborhoodBoundaries} onChange={v => u('neighborhoodBoundaries', v)} /></F>
+        <F label="Neighborhood Description"><Textarea val={f.neighborhoodDesc} onChange={v => u('neighborhoodDesc', v)} rows={2} /></F>
+        <G3>
+          <F label="Land Use 1-Unit %"><Input val={f.landUse1Unit} onChange={v => u('landUse1Unit', v)} type="number" /></F>
+          <F label="Land Use 2-4 Unit %"><Input val={f.landUse24Unit} onChange={v => u('landUse24Unit', v)} type="number" /></F>
+          <F label="Commercial %"><Input val={f.landUseCommercial} onChange={v => u('landUseCommercial', v)} type="number" /></F>
+        </G3>
+        <G3>
+          <F label="Property Values" req>
+            <Sel val={f.propertyValues} onChange={v => u('propertyValues', v)}
+              opts={['Increasing','Stable','Declining']} placeholder="Select" />
+          </F>
+          <F label="Demand/Supply" req>
+            <Sel val={f.demandSupply} onChange={v => u('demandSupply', v)}
+              opts={['Shortage','In Balance','Over Supply']} placeholder="Select" />
+          </F>
+          <F label="Marketing Time" req>
+            <Sel val={f.marketingTime} onChange={v => u('marketingTime', v)}
+              opts={['Under 3 Months','3-6 Months','Over 6 Months']} placeholder="Select" />
+          </F>
+        </G3>
+        <G3>
+          <F label="Price Range Low ($)"><Input val={f.priceRangeLow} onChange={v => u('priceRangeLow', v)} type="number" /></F>
+          <F label="Price Range High ($)"><Input val={f.priceRangeHigh} onChange={v => u('priceRangeHigh', v)} type="number" /></F>
+          <F label="Predominant Price ($)"><Input val={f.priceRangePred} onChange={v => u('priceRangePred', v)} type="number" /></F>
+          <F label="Age Range Low (yrs)"><Input val={f.ageLow} onChange={v => u('ageLow', v)} type="number" /></F>
+          <F label="Age Range High (yrs)"><Input val={f.ageHigh} onChange={v => u('ageHigh', v)} type="number" /></F>
+          <F label="Predominant Age (yrs)"><Input val={f.agePred} onChange={v => u('agePred', v)} type="number" /></F>
+        </G3>
+        <F label="Market Commentary"><Textarea val={f.marketCommentary} onChange={v => u('marketCommentary', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '06': () => (
+      <div>
+        <SectionHeader num="06" title="Site" mandatory />
+        <G3>
+          <F label="Site Area" req><Input val={f.siteArea} onChange={v => u('siteArea', v)} type="number" /></F>
+          <F label="Unit">
+            <Sel val={f.siteUnit} onChange={v => u('siteUnit', v)} opts={['sq ft','acres']} />
+          </F>
+          <F label="Shape">
+            <Sel val={f.siteShape} onChange={v => u('siteShape', v)}
+              opts={['Rectangular','Irregular','Flag Lot','Triangular','Other']} placeholder="Select" />
+          </F>
+          <F label="Zoning Classification" req><Input val={f.zoning} onChange={v => u('zoning', v)} /></F>
+          <F label="Zoning Description"><Input val={f.zoningDesc} onChange={v => u('zoningDesc', v)} /></F>
+          <F label="Zoning Compliance" req>
+            <Sel val={f.zoningCompliance} onChange={v => u('zoningCompliance', v)}
+              opts={['Legal','Legal Non-Conforming','Illegal','No Zoning']} placeholder="Select" />
+          </F>
+          <F label="Street Type">
+            <Sel val={f.streetType} onChange={v => u('streetType', v)}
+              opts={['Public','Private','None']} placeholder="Select" />
+          </F>
+          <F label="Street Surface">
+            <Sel val={f.streetSurface} onChange={v => u('streetSurface', v)}
+              opts={['Paved','Gravel','Dirt','Other']} placeholder="Select" />
+          </F>
+          <F label="Alley">
+            <Sel val={f.alley} onChange={v => u('alley', v)}
+              opts={['None','Paved','Gravel']} placeholder="Select" />
+          </F>
+        </G3>
+        <G2>
+          <F label="Utilities — Electric">
+            <Sel val={f.utilElectric} onChange={v => u('utilElectric', v)}
+              opts={['Public','Community','Private','None']} placeholder="Select" />
+          </F>
+          <F label="Utilities — Gas">
+            <Sel val={f.utilGas} onChange={v => u('utilGas', v)}
+              opts={['Public','Community','Private','None']} placeholder="Select" />
+          </F>
+          <F label="Utilities — Water">
+            <Sel val={f.utilWater} onChange={v => u('utilWater', v)}
+              opts={['Public','Community','Well — Individual','Shared Well','None']} placeholder="Select" />
+          </F>
+          <F label="Utilities — Sewer">
+            <Sel val={f.utilSewer} onChange={v => u('utilSewer', v)}
+              opts={['Public','Community','Septic — Individual','Shared Septic','None']} placeholder="Select" />
+          </F>
+        </G2>
+        <div className="border-t border-gray-200 pt-4 mt-2">
+          <div className="mb-3">
+            <Toggle on={f.hasWaterFrontage} onChange={v => u('hasWaterFrontage', v)} label="Water Frontage Present" />
+          </div>
+          {f.hasWaterFrontage && (
+            <div className="bg-blue-50 border border-blue-200 rounded p-3">
+              <ConditionalBanner text="Water frontage documentation required — photos must be included in Site Exhibits with caption 'Water Frontage'." />
+              <G2>
+                <F label="Water Frontage Type" req>
+                  <Sel val={f.waterFrontageType} onChange={v => u('waterFrontageType', v)}
+                    opts={['Ocean','Bay','River','Lake','Canal','Creek','Pond','Other']} placeholder="Select" />
+                </F>
+                <F label="Access">
+                  <Sel val={f.waterFrontageAccess} onChange={v => u('waterFrontageAccess', v)}
+                    opts={['Private','Shared','Public']} placeholder="Select" />
+                </F>
+                <F label="Linear Footage"><Input val={f.waterLinFt} onChange={v => u('waterLinFt', v)} type="number" /></F>
+                <F label="Water Frontage Commentary"><Input val={f.waterFrontageComm} onChange={v => u('waterFrontageComm', v)} /></F>
+              </G2>
             </div>
-          </SectionCard>
-          <SectionCard title="Contract Information" badge="CONDITIONAL">
-            <Row cols={3}>
-              <FL label="Contract Date"><Input type="date" /></FL>
-              <FL label="Contract Price ($)"><Input placeholder="0" /></FL>
-              <FL label="Listing Price ($)"><Input placeholder="0" /></FL>
-            </Row>
-            <FL label="Financial Assistance / Seller Concessions"><Textarea placeholder="None noted" rows={2} /></FL>
-          </SectionCard>
+          )}
         </div>
-      );
+        <F label="Site Topography"><Input val={f.siteTopography} onChange={v => u('siteTopography', v)} /></F>
+        <F label="Site Influences / External Factors"><Input val={f.siteInfluences} onChange={v => u('siteInfluences', v)} placeholder="e.g., Hwy Busy, PwrLn Neg, IndustrAdjcnt" /></F>
+        <F label="Site Commentary"><Textarea val={f.siteCommentary} onChange={v => u('siteCommentary', v)} rows={2} /></F>
+      </div>
+    ),
 
-      case 'site': return (
-        <div>
-          <SectionCard title="Site" badge="MANDATORY">
-            <Row cols={3}>
-              <FL label="Lot Size (sf)"><Input placeholder="7,500" /></FL>
-              <FL label="Lot Size (acres)"><Input placeholder="0.17" /></FL>
-              <FL label="Shape"><Select value="Rectangular" onChange={()=>{}} options={['Rectangular','Irregular','Triangular','Flag Lot','Other']} /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="Topography"><Select value="Level" onChange={()=>{}} options={['Level','Gently Rolling','Steep','Other']} /></FL>
-              <FL label="Drainage"><Select value="Adequate" onChange={()=>{}} options={['Adequate','Ponding','Other']} /></FL>
-              <FL label="Flood Zone"><Input placeholder="Zone X" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="FIRM Map #"><Input placeholder="48453C0465L" /></FL>
-              <FL label="FIRM Map Date"><Input type="date" /></FL>
-            </Row>
-            <Divider />
-            <SectionCard title="Zoning">
-              <Row cols={3}>
-                <FL label="Zoning Classification"><Input placeholder="SF-2" /></FL>
-                <FL label="Zoning Description"><Input placeholder="Single-Family Residential" /></FL>
-                <FL label="Legally Conforming">
-                  <Select value="Yes" onChange={()=>{}} options={['Yes','Legal Nonconforming (Grandfathered)','No','No Zoning']} />
-                </FL>
-              </Row>
-              <FL label="Zoning Comments"><Textarea placeholder="Property use is consistent with applicable zoning regulations." rows={2} /></FL>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Utilities">
-              {[['Electric','Gas'],['Water','Sanitary Sewer'],['Broadband Internet','Storm Sewer']].map(([a,b]) => (
-                <Row key={a} cols={2}>
-                  <FL label={a}><Select value="Public" onChange={()=>{}} options={['Public','Community','Private','None']} /></FL>
-                  <FL label={b}><Select value="Public" onChange={()=>{}} options={['Public','Community','Private','None','Septic System (Private)']} /></FL>
-                </Row>
-              ))}
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Street / Access">
-              <Row cols={3}>
-                <FL label="Street Surface"><Select value="Paved" onChange={()=>{}} options={['Paved','Gravel','Dirt']} /></FL>
-                <FL label="Street Type"><Select value="Public" onChange={()=>{}} options={['Public','Private']} /></FL>
-                <FL label="Alley"><Select value="None" onChange={()=>{}} options={['None','Paved','Gravel','Dirt']} /></FL>
-              </Row>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Location & Influences">
-              <Row cols={3}>
-                <FL label="Location Rating"><Select value="N; Res" onChange={()=>{}} options={['N; Res','B; Res','A; Res','B; BsyRd','A; BsyRd','B; Wtr','N; Wtr','A; Ind','B; GlfCse','N; Pstrl']} /></FL>
-                <FL label="View Rating"><Select value="N; Res" onChange={()=>{}} options={['N; Res','B; Res','B; Wtr','B; Pstrl','B; GlfCse','A; BsyRd','A; Ind','A; RRtracks','N; Pstrl']} /></FL>
-                <FL label="Neighborhood Type"><Select value="Urban" onChange={()=>{}} options={['Urban','Suburban','Rural']} /></FL>
-              </Row>
-              <FL label="Adverse Site Influences"><Textarea placeholder="None noted. No adverse environmental conditions…" rows={2} /></FL>
-              <FL label="Site Defects, Damages & Deficiencies" conditional><Textarea placeholder="Describe any observed site defects…" rows={2} /></FL>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Site Improvements">
-              <FL label="Site Improvements Description"><Textarea placeholder="Driveway, walkway, landscaping, fencing…" rows={2} /></FL>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Site Valuation">
-              <Row cols={2}>
-                <FL label="Site Valuation Method"><Select value="Extraction" onChange={()=>{}} options={['Allocation','Extraction','Sales Comparison','Other']} /></FL>
-                <FL label="Estimated Site Value ($)"><Input placeholder="75,000" /></FL>
-              </Row>
-            </SectionCard>
-          </SectionCard>
+    '07': () => (
+      <div>
+        <SectionHeader num="07" title="Dwelling Exterior" mandatory />
+        {isMH && <ConditionalBanner text="Manufactured home detected — HUD tag, serial number, and manufacturer fields required in Section 15." />}
+        <G3>
+          <F label="Year Built" req><Input val={f.yearBuilt} onChange={v => u('yearBuilt', v)} type="number" /></F>
+          <F label="Effective Age (yrs)"><Input val={f.effectiveAge} onChange={v => u('effectiveAge', v)} type="number" /></F>
+          <F label="Stories" req><Input val={f.stories} onChange={v => u('stories', v)} type="number" /></F>
+          <F label="Design / Style" req>
+            <Sel val={f.designStyle} onChange={v => u('designStyle', v)}
+              opts={['Ranch','Colonial','Split Level','Contemporary','Victorian','Bi-Level','Townhouse','Row','Other']} placeholder="Select" />
+          </F>
+          <F label="Construction Method" req>
+            <Sel val={f.manufacturingMethod} onChange={v => u('manufacturingMethod', v)}
+              opts={['Site-Built','Modular','Manufactured','Panelized']} />
+          </F>
+          <F label="Foundation" req>
+            <Sel val={f.foundationType} onChange={v => u('foundationType', v)}
+              opts={['Concrete Slab','Crawl Space','Full Basement','Partial Basement','Pier & Beam','Other']} placeholder="Select" />
+          </F>
+          <F label="Exterior Walls" req>
+            <Sel val={f.exteriorWalls} onChange={v => u('exteriorWalls', v)}
+              opts={['Brick','Vinyl Siding','Wood Siding','Stucco','Fiber Cement','Stone','EIFS','Other']} placeholder="Select" />
+          </F>
+          <F label="Roof Surface" req>
+            <Sel val={f.roofSurface} onChange={v => u('roofSurface', v)}
+              opts={['Asphalt Shingle','Metal','Tile','Wood Shake','Slate','Built-Up','Other']} placeholder="Select" />
+          </F>
+          <F label="Roof Type">
+            <Sel val={f.roofType} onChange={v => u('roofType', v)}
+              opts={['Gable','Hip','Flat','Mansard','Shed','Gambrel','Mixed','Other']} placeholder="Select" />
+          </F>
+          <F label="Window Type">
+            <Sel val={f.windowType} onChange={v => u('windowType', v)}
+              opts={['Single Pane','Double Pane','Triple Pane','Storm','Other']} placeholder="Select" />
+          </F>
+        </G3>
+        <div className="flex gap-6 mb-4">
+          <Toggle on={f.gutters} onChange={v => u('gutters', v)} label="Gutters / Downspouts" />
+          <Toggle on={f.stormSash} onChange={v => u('stormSash', v)} label="Storm Sash" />
+          <Toggle on={f.screens} onChange={v => u('screens', v)} label="Screens" />
         </div>
-      );
 
-      case 'dwelling_ext': return (
-        <div>
-          <SectionCard title="Dwelling Exterior" badge="MANDATORY">
-            <Row cols={3}>
-              <FL label="Year Built"><Input placeholder="1998" /></FL>
-              <FL label="Effective Age (yrs)"><Input placeholder="15" /></FL>
-              <FL label="Remaining Economic Life (yrs)"><Input placeholder="40" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Design / Style"><Input placeholder="Ranch / Contemporary" /></FL>
-              <FL label="Attached / Detached"><Select value="Detached" onChange={()=>{}} options={['Detached','Attached','Semi-Detached']} /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Stories"><Input placeholder="1" /></FL>
-              <FL label="Levels"><Input placeholder="1" /></FL>
-            </Row>
-            <Divider />
-            <SectionCard title="Construction & Materials">
-              <Row cols={2}>
-                <FL label="Foundation"><Select value="Slab" onChange={()=>{}} options={['Concrete Slab','Crawl Space','Full Basement','Partial Basement','Piers','Other']} /></FL>
-                <FL label="Basement Area (sf)"><Input placeholder="0" /></FL>
-              </Row>
-              <Row cols={2}>
-                <FL label="Exterior Walls"><Input placeholder="Brick Veneer / Frame" /></FL>
-                <FL label="Roof Surface"><Input placeholder="Composition Shingle" /></FL>
-              </Row>
-              <Row cols={2}>
-                <FL label="Gutters & Downspouts"><Input placeholder="Aluminum" /></FL>
-                <FL label="Window Type"><Input placeholder="Double-Pane / Vinyl" /></FL>
-              </Row>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Exterior Quality & Condition">
-              <Row cols={2}>
-                <FL label="Exterior Quality Rating">
-                  <Select value={extQ} onChange={e => setExtQ(e.target.value)} options={qOpts} />
-                </FL>
-                <FL label="Exterior Condition Rating">
-                  <Select value={extC} onChange={e => setExtC(e.target.value)} options={cOpts} />
-                </FL>
-              </Row>
-              <FL label="Exterior Quality / Condition Comments"><Textarea placeholder="Exterior materials are consistent with the quality rating. No deferred maintenance observed…" rows={3} /></FL>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Defects, Damages & Deficiencies (Exterior)" badge="CONDITIONAL">
-              <FL label="Observed Defects" conditional><Textarea placeholder="Describe any exterior defects observed during inspection…" rows={3} /></FL>
-              <Row cols={2}>
-                <FL label="Impact on Value"><Select value="None" onChange={()=>{}} options={['None','Adverse','Significant']} /></FL>
-                <FL label="Impact on Marketability"><Select value="None" onChange={()=>{}} options={['None','Adverse','Significant']} /></FL>
-              </Row>
-            </SectionCard>
-          </SectionCard>
+        {/* Vehicle Storage trigger lives here */}
+        <div className="border-t border-gray-200 pt-4 mt-2">
+          <F label="Vehicle Storage Type" req hint={f.vehicleStorage !== 'None' ? 'Vehicle Storage section added to navigator' : ''}>
+            <Sel val={f.vehicleStorage} onChange={v => u('vehicleStorage', v)}
+              opts={['None','Driveway','Carport','Garage — Attached','Garage — Detached','Garage — Built-In','Parking Structure','Other']}
+              placeholder="Select" />
+          </F>
         </div>
-      );
+        <F label="Dwelling Exterior Commentary"><Textarea val={f.dwellExtComm} onChange={v => u('dwellExtComm', v)} rows={2} /></F>
+      </div>
+    ),
 
-      case 'unit_interior': return (
-        <div>
-          <SectionCard title="Unit Interior" badge="MANDATORY">
-            <SectionCard title="Room Count & GLA">
-              <Row cols={4}>
-                <FL label="Total Rooms"><Input placeholder="7" /></FL>
-                <FL label="Bedrooms"><Input placeholder="3" /></FL>
-                <FL label="Full Baths"><Input placeholder="2" /></FL>
-                <FL label="Half Baths"><Input placeholder="1" /></FL>
-              </Row>
-              <Row cols={3}>
-                <FL label="Above-Grade GLA (sf)" note="ANSI Z765"><Input placeholder="2,340" /></FL>
-                <FL label="Below-Grade Area (sf)"><Input placeholder="0" /></FL>
-                <FL label="Below-Grade Finished (sf)"><Input placeholder="0" /></FL>
-              </Row>
-              <FL label="Level-by-Level Breakdown" conditional note="(ADU / Multi-level)"><Textarea placeholder="Level 1: 1,340 sf · Level 2: 1,000 sf" rows={2} /></FL>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Finishes & Features">
-              <Row cols={2}>
-                <FL label="Floors"><Input placeholder="Hardwood, Tile, Carpet" /></FL>
-                <FL label="Walls / Trim"><Input placeholder="Painted Drywall / Wood" /></FL>
-              </Row>
-              <Row cols={2}>
-                <FL label="Bath Wainscot"><Input placeholder="Ceramic Tile" /></FL>
-                <FL label="Doors"><Input placeholder="Solid Core / Panel" /></FL>
-              </Row>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Mechanical Systems">
-              <Row cols={2}>
-                <FL label="Heating Type"><Select value="Forced Air" onChange={()=>{}} options={['Forced Air','Radiant','Baseboard','Heat Pump','Wall Unit','None']} /></FL>
-                <FL label="Heating Fuel"><Select value="Natural Gas" onChange={()=>{}} options={['Natural Gas','Electric','Oil','Propane','Other']} /></FL>
-              </Row>
-              <Row cols={2}>
-                <FL label="Cooling"><Select value="Central Air" onChange={()=>{}} options={['Central Air','Individual Units','Evaporative','None']} /></FL>
-                <FL label="Water Heater"><Select value="Gas Tank" onChange={()=>{}} options={['Gas Tank','Electric Tank','Tankless Gas','Tankless Electric','Solar','Other']} /></FL>
-              </Row>
-              <Row cols={2}>
-                <FL label="Laundry"><Select value="In-Unit" onChange={()=>{}} options={['In-Unit','Shared','None']} /></FL>
-                <FL label="Fireplace(s)" note="Count"><Input placeholder="1" /></FL>
-              </Row>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Kitchen Equipment">
-              <Row cols={3}>
-                {['Refrigerator','Dishwasher','Range/Oven','Microwave','Disposal','Washer/Dryer Hook-up'].map(k => (
-                  <CheckRow key={k} label={k} checked={true} onChange={()=>{}} />
-                ))}
-              </Row>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Attic">
-              <Row cols={3}>
-                <FL label="Access"><Select value="Drop Stair" onChange={()=>{}} options={['None','Scuttle','Drop Stair','Stairs','Other']} /></FL>
-                <FL label="Finish"><Select value="Unfinished" onChange={()=>{}} options={['Unfinished','Partially Finished','Finished']} /></FL>
-                <FL label="Heated / Cooled"><Select value="No" onChange={()=>{}} options={['Yes','No']} /></FL>
-              </Row>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Update Level" badge="UAD 3.6">
-              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                {['Not Updated','Updated','Remodeled'].map(u => (
-                  <button key={u} onClick={() => setUpdateLevel(u)} style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: `1px solid ${updateLevel === u ? '#2563eb' : '#e2e8f0'}`, background: updateLevel === u ? '#2563eb' : 'white', color: updateLevel === u ? 'white' : '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                    {u}
+    '08': () => (
+      <div>
+        <SectionHeader num="08" title="Unit Interior" mandatory />
+        <G3>
+          <F label="Gross Living Area (ANSI)" req hint="ANSI Z765 — above grade only">
+            <Input val={f.gla} onChange={v => u('gla', v)} type="number" placeholder="sq ft" />
+          </F>
+          <F label="Below Grade Total Sq Ft"><Input val={f.glaBelowGrade} onChange={v => u('glaBelowGrade', v)} type="number" /></F>
+          <F label="Below Grade Finished Sq Ft"><Input val={f.belowGradeFinished} onChange={v => u('belowGradeFinished', v)} type="number" /></F>
+          <F label="Bedrooms (Above Grade)" req><Input val={f.bedrooms} onChange={v => u('bedrooms', v)} type="number" /></F>
+          <F label="Full Baths (Above Grade)" req><Input val={f.bathrooms} onChange={v => u('bathrooms', v)} type="number" /></F>
+          <F label="Half Baths"><Input val={f.halfBaths} onChange={v => u('halfBaths', v)} type="number" /></F>
+          <F label="Floor Covering">
+            <Sel val={f.floors} onChange={v => u('floors', v)}
+              opts={['Hardwood','Carpet','Tile','Vinyl','Laminate','Concrete','Mixed','Other']} placeholder="Select" />
+          </F>
+          <F label="Walls">
+            <Sel val={f.walls} onChange={v => u('walls', v)}
+              opts={['Drywall','Plaster','Paneling','Other']} placeholder="Select" />
+          </F>
+          <F label="Trim / Finish">
+            <Sel val={f.trimFinish} onChange={v => u('trimFinish', v)}
+              opts={['Paint','Stain','Other']} placeholder="Select" />
+          </F>
+          <F label="Heating Type" req>
+            <Sel val={f.heatingType} onChange={v => u('heatingType', v)}
+              opts={['Forced Air','Radiant','Baseboard','Heat Pump','Geothermal','None']} placeholder="Select" />
+          </F>
+          <F label="Heating Fuel">
+            <Sel val={f.heatingFuel} onChange={v => u('heatingFuel', v)}
+              opts={['Natural Gas','Electric','Oil','Propane','Solar','Other']} placeholder="Select" />
+          </F>
+          <F label="Cooling Type" req>
+            <Sel val={f.coolingType} onChange={v => u('coolingType', v)}
+              opts={['Central Air','Wall Unit','Evaporative','Heat Pump','None']} placeholder="Select" />
+          </F>
+        </G3>
+        <G2>
+          <F label="Fireplace Type">
+            <Sel val={f.amenitiesFireplace} onChange={v => u('amenitiesFireplace', v)}
+              opts={['None','Wood Burning','Gas','Electric','Other']} placeholder="Select" />
+          </F>
+          {f.amenitiesFireplace && f.amenitiesFireplace !== 'None' && (
+            <F label="# of Fireplaces"><Input val={f.amenitiesFireplaceCount} onChange={v => u('amenitiesFireplaceCount', v)} type="number" /></F>
+          )}
+        </G2>
+        <div className="border-t border-gray-200 pt-4 mt-2">
+          <Toggle on={f.hasADU} onChange={v => u('hasADU', v)} label="Accessory Dwelling Unit (ADU) Present" />
+          {f.hasADU && <p className="text-xs text-amber-600 mt-1 ml-12">⚡ ADU / Additional Unit section added to navigator</p>}
+        </div>
+        <F label="Interior Commentary"><Textarea val={f.interiorComm} onChange={v => u('interiorComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '09': () => (
+      <div>
+        <SectionHeader num="09" title="Vehicle Storage" badge={f.vehicleStorage} />
+        <ConditionalBanner text={`Vehicle storage type "${f.vehicleStorage}" detected — additional documentation required.`} />
+        <G3>
+          <F label="# of Spaces" req><Input val={f.vehicleSpaces} onChange={v => u('vehicleSpaces', v)} type="number" /></F>
+          <F label="Size (sq ft)"><Input val={f.vehicleSize} onChange={v => u('vehicleSize', v)} type="number" /></F>
+          <F label="Condition">
+            <Sel val={f.vehicleCondition} onChange={v => u('vehicleCondition', v)}
+              opts={['C1','C2','C3','C4','C5','C6']} placeholder="Select" />
+          </F>
+        </G3>
+        <F label="Vehicle Storage Commentary"><Textarea val={f.vehicleComm} onChange={v => u('vehicleComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '10': () => (
+      <div>
+        <SectionHeader num="10" title="Subject Property Amenities" mandatory />
+        <p className="text-xs text-gray-500 mb-3">Select all amenities present. Relevant toggles may unlock additional conditional sections.</p>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          {[['pool','Pool'],['spa','Spa/Hot Tub'],['fence','Fence'],['patio','Patio'],
+            ['deck','Deck'],['porch','Porch'],['shed','Storage Shed']].map(([key, lbl]) => (
+            <Toggle key={key} on={f[key]} onChange={v => u(key, v)} label={lbl} />
+          ))}
+        </div>
+        <div className="border-t border-gray-200 pt-4">
+          <Toggle on={f.hasEnergyFeatures} onChange={v => u('hasEnergyFeatures', v)} label="Energy / Green Features Present" />
+          {f.hasEnergyFeatures && <p className="text-xs text-amber-600 mt-1 ml-12">⚡ Energy & Green Features section added to navigator</p>}
+        </div>
+        <div className="border-t border-gray-200 pt-4 mt-3">
+          <Toggle on={f.hasOutbuilding} onChange={v => u('hasOutbuilding', v)} label="Outbuilding Present" />
+          {f.hasOutbuilding && <p className="text-xs text-amber-600 mt-1 ml-12">⚡ Outbuilding section added to navigator</p>}
+        </div>
+        <F label="Amenities Commentary"><Textarea val={f.amenitiesComm} onChange={v => u('amenitiesComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '11': () => (
+      <div>
+        <SectionHeader num="11" title="Overall Quality & Condition" mandatory />
+
+        {/* Quality */}
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-gray-600 mb-2">Quality Rating <span className="text-red-500">*</span></p>
+          <div className="grid grid-cols-6 gap-2">
+            {['Q1','Q2','Q3','Q4','Q5','Q6'].map(q => (
+              <button key={q} onClick={() => u('qualityRating', q)}
+                className={`py-2 rounded border text-sm font-bold transition-colors ${f.qualityRating === q ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-700 hover:border-blue-400'}`}>
+                {q}
+              </button>
+            ))}
+          </div>
+          {f.qualityRating && (
+            <p className="text-xs text-blue-600 mt-2">
+              {{Q1:'Exceptional — unique architectural design, highest quality materials.',
+                Q2:'Excellent — superior quality finishes, exceptional craftsmanship.',
+                Q3:'Good — superior construction with quality finishes above standard.',
+                Q4:'Average — standard quality, meets minimum building codes.',
+                Q5:'Fair — basic construction, may not meet current codes.',
+                Q6:'Poor — severe deficiencies, unsafe or unfit for occupancy.'}[f.qualityRating]}
+            </p>
+          )}
+        </div>
+
+        {/* Condition */}
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-gray-600 mb-2">Condition Rating <span className="text-red-500">*</span></p>
+          <div className="grid grid-cols-6 gap-2">
+            {['C1','C2','C3','C4','C5','C6'].map(c => (
+              <button key={c} onClick={() => u('conditionRating', c)}
+                className={`py-2 rounded border text-sm font-bold transition-colors ${f.conditionRating === c
+                  ? c === 'C5' || c === 'C6' ? 'bg-red-600 text-white border-red-600' : 'bg-blue-600 text-white border-blue-600'
+                  : 'border-gray-300 text-gray-700 hover:border-blue-400'}`}>
+                {c}
+              </button>
+            ))}
+          </div>
+          {f.conditionRating && (
+            <p className={`text-xs mt-2 ${showDefects ? 'text-red-600 font-semibold' : 'text-blue-600'}`}>
+              {{C1:'New construction — never previously occupied.',
+                C2:'Excellent — no deferred maintenance, recently updated.',
+                C3:'Good — minor deferred maintenance, well maintained overall.',
+                C4:'Average — some deferred maintenance, adequate condition.',
+                C5:'Fair — significant deferred maintenance, deficiencies present.',
+                C6:'Poor — severe deferred maintenance, potential safety hazards.'}[f.conditionRating]}
+              {showDefects && ' ⚡ Defects & deficiency fields required below.'}
+            </p>
+          )}
+        </div>
+
+        {/* Defects — conditional on C5/C6 */}
+        {showDefects && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <p className="text-xs font-bold text-red-700 mb-3 uppercase">Required: Defects & Deficiencies ({f.conditionRating})</p>
+            <F label="Physical Defects / Deficiencies" req>
+              <Textarea val={f.defects} onChange={v => u('defects', v)}
+                placeholder="Describe all observable physical defects, damages, and deficiencies..." rows={3} />
+            </F>
+            <F label="Physical Deficiencies Affecting Safety / Livability" req>
+              <Textarea val={f.physicalDeficiencies} onChange={v => u('physicalDeficiencies', v)}
+                placeholder="Describe deficiencies affecting safety or habitability..." rows={2} />
+            </F>
+            <F label="Adverse Environmental Conditions">
+              <Textarea val={f.adverseEnvConditions} onChange={v => u('adverseEnvConditions', v)}
+                placeholder="Describe any hazardous substances, environmental contamination..." rows={2} />
+            </F>
+            <div className="mt-3">
+              <Toggle on={f.hasFunctionalObsolescence} onChange={v => u('hasFunctionalObsolescence', v)} label="Functional Obsolescence Present" />
+              {f.hasFunctionalObsolescence && <p className="text-xs text-amber-600 mt-1 ml-12">⚡ Functional Obsolescence section added to navigator</p>}
+            </div>
+          </div>
+        )}
+
+        {/* Updates */}
+        <div className="border-t border-gray-200 pt-4">
+          <p className="text-xs font-semibold text-gray-600 mb-3">Update Level</p>
+          <G3>
+            <F label="Kitchen Update">
+              <Sel val={f.kitchenUpdate} onChange={v => u('kitchenUpdate', v)}
+                opts={['No Updates','Minor Updates','Significant Updates','Fully Remodeled']} placeholder="Select" />
+            </F>
+            <F label="Bath Update">
+              <Sel val={f.bathUpdate} onChange={v => u('bathUpdate', v)}
+                opts={['No Updates','Minor Updates','Significant Updates','Fully Remodeled']} placeholder="Select" />
+            </F>
+            <F label="Other Updates">
+              <Sel val={f.otherUpdate} onChange={v => u('otherUpdate', v)}
+                opts={['No Updates','Minor Updates','Significant Updates','Fully Remodeled']} placeholder="Select" />
+            </F>
+          </G3>
+          <F label="Update Timeframe">
+            <Sel val={f.updateTimeframe} onChange={v => u('updateTimeframe', v)}
+              opts={['0-5 Yrs','6-10 Yrs','11-15 Yrs','16-20 Yrs','20+ Yrs','Unknown']} placeholder="Select" />
+          </F>
+        </div>
+
+        {/* View */}
+        <div className="border-t border-gray-200 pt-4">
+          <p className="text-xs font-semibold text-gray-600 mb-2">View Rating <span className="text-red-500">*</span></p>
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            {[['N','Neutral'],['B','Beneficial'],['A','Adverse']].map(([v, lbl]) => (
+              <button key={v} onClick={() => { u('viewRating', v); u('viewFactors', []); }}
+                className={`py-2 rounded border text-sm font-bold transition-colors ${f.viewRating === v
+                  ? v === 'A' ? 'bg-red-500 text-white border-red-500' : v === 'B' ? 'bg-green-500 text-white border-green-500' : 'bg-gray-500 text-white border-gray-500'
+                  : 'border-gray-300 text-gray-700 hover:border-blue-400'}`}>
+                {v} — {lbl}
+              </button>
+            ))}
+          </div>
+          {f.viewRating && (
+            <div className="bg-gray-50 border border-gray-200 rounded p-3">
+              <p className="text-xs font-semibold text-gray-600 mb-2">View Factors <span className="text-gray-400">(select 1–2)</span></p>
+              <div className="flex flex-wrap gap-2">
+                {['Wtr','Pstrl','Res','Ind','Busy Str','Lt Traf','Lmtd Sgt','Prk Vw','Str Vw','Mtn Vw','CtyVw','GlfVw','WtrFr'].map(vf => (
+                  <button key={vf} onClick={() => toggleViewFactor(vf)}
+                    className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${f.viewFactors.includes(vf) ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-600 hover:border-blue-300'}`}>
+                    {vf}
                   </button>
                 ))}
               </div>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
-                {updateLevel === 'Not Updated' && 'Little or no updating in the prior 15 years. The improvements require considerable updating.'}
-                {updateLevel === 'Updated' && 'Some updating of finishes/functional utility in the prior 15 years. Minor cosmetic updates are not considered.'}
-                {updateLevel === 'Remodeled' && 'Significant finish and/or functional changes in the prior 15 years that increased functionality and/or livability.'}
-              </div>
-              <Row cols={2}>
-                <FL label="Estimated Year of Update (Kitchen)"><Input placeholder="2019" /></FL>
-                <FL label="Estimated Year of Update (Baths)"><Input placeholder="2021" /></FL>
-              </Row>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Interior Quality & Condition">
-              <Row cols={2}>
-                <FL label="Interior Quality Rating">
-                  <Select value={intQ} onChange={e => setIntQ(e.target.value)} options={qOpts} />
-                </FL>
-                <FL label="Interior Condition Rating">
-                  <Select value={intC} onChange={e => setIntC(e.target.value)} options={cOpts} />
-                </FL>
-              </Row>
-              <FL label="Interior Quality / Condition Comments"><Textarea placeholder="Interior finishes are consistent with quality rating. Kitchen and baths have been updated…" rows={3} /></FL>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="Defects, Damages & Deficiencies (Interior)" badge="CONDITIONAL">
-              <FL label="Observed Defects" conditional><Textarea placeholder="Describe any interior defects observed during inspection…" rows={3} /></FL>
-            </SectionCard>
-          </SectionCard>
-        </div>
-      );
-
-      case 'quality': return (
-        <div>
-          <SectionCard title="Overall Quality & Condition" badge="MANDATORY">
-            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 10, marginBottom: 14, fontSize: 11, color: '#0369a1' }}>
-              Overall ratings are <strong>absolute</strong> (not comparative). Exterior Q: <strong>{extQ}</strong> · Interior Q: <strong>{intQ}</strong> · Exterior C: <strong>{extC}</strong> · Interior C: <strong>{intC}</strong>
+              {f.viewFactors.length > 0 && <p className="text-xs text-blue-600 mt-2">Selected: {f.viewFactors.join(', ')}</p>}
             </div>
-            <Row cols={2}>
-              <FL label="Overall Quality Rating (Q1–Q6)">
-                <Select value={ovQ} onChange={e => setOvQ(e.target.value)} options={qOpts} />
-              </FL>
-              <FL label="Overall Condition Rating (C1–C6)">
-                <Select value={ovC} onChange={e => setOvC(e.target.value)} options={cOpts} />
-              </FL>
-            </Row>
-            <FL label="Quality Narrative / Support Comments">
-              <Textarea placeholder="The overall quality rating of Q4 reflects standard quality construction with average workmanship and materials consistent with…" rows={4} />
-            </FL>
-            <FL label="Condition Narrative / Support Comments">
-              <Textarea placeholder="The overall condition of C3 reflects a well-maintained property with no significant deferred maintenance. The roof, HVAC, and mechanical systems are…" rows={4} />
-            </FL>
-            <Divider />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, background: '#f8fafc', borderRadius: 10, padding: 14 }}>
-              {[['Overall Quality',ovQ,'#2563eb'],['Overall Condition',ovC,'#7c3aed'],['Update Level',updateLevel,'#0891b2']].map(([l,v,c]) => (
-                <div key={l} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: c }}>{v}</div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>{l}</div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
+          )}
         </div>
-      );
+        <F label="Quality & Condition Commentary" req>
+          <Textarea val={f.qcCommentary} onChange={v => u('qcCommentary', v)}
+            placeholder="Describe quality and condition observations supporting the ratings above..." rows={3} />
+        </F>
+      </div>
+    ),
 
-      case 'amenities': return (
+    '12': () => (
+      <div>
+        <SectionHeader num="12" title="Outbuilding" />
+        <ConditionalBanner text="Outbuilding present — document all outbuildings on the subject site." />
+        <G3>
+          <F label="Outbuilding Type" req>
+            <Sel val={f.outbuildingType} onChange={v => u('outbuildingType', v)}
+              opts={['Barn','Workshop','Guest House','Storage','Pool House','Greenhouse','Other']} placeholder="Select" />
+          </F>
+          <F label="Size (sq ft)" req><Input val={f.outbuildingSize} onChange={v => u('outbuildingSize', v)} type="number" /></F>
+          <F label="Condition">
+            <Sel val={f.outbuildingCondition} onChange={v => u('outbuildingCondition', v)}
+              opts={['C1','C2','C3','C4','C5','C6']} placeholder="Select" />
+          </F>
+        </G3>
+        <F label="Outbuilding Commentary"><Textarea val={f.outbuildingComm} onChange={v => u('outbuildingComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '13': () => (
+      <div>
+        <SectionHeader num="13" title="Functional Obsolescence" />
+        <ConditionalBanner text="Functional obsolescence requires description and must be considered in value conclusions." />
+        <F label="Description of Functional Obsolescence" req>
+          <Textarea val={f.functionalObsDesc} onChange={v => u('functionalObsDesc', v)}
+            placeholder="Describe functional obsolescence — e.g., non-conforming floor plan, outdated mechanical systems, excess/deficient room count, poor layout..." rows={4} />
+        </F>
+        <G2>
+          <F label="Type">
+            <Sel val={f.functionalObsType} onChange={v => u('functionalObsType', v)}
+              opts={['Curable','Incurable','Both']} placeholder="Select" />
+          </F>
+          <F label="Estimated Impact on Value ($)"><Input val={f.functionalObsValue} onChange={v => u('functionalObsValue', v)} type="number" /></F>
+        </G2>
+      </div>
+    ),
+
+    '14': () => (
+      <div>
+        <SectionHeader num="14" title="Energy & Green Features" />
+        <ConditionalBanner text="Energy-efficient features detected — document all green/energy components and any certifications." />
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          {[['energySolar','Solar Panels'],['energyGeothermal','Geothermal'],['energyWindTurbine','Wind Turbine'],
+            ['energyBattery','Battery Storage'],['energyEV','EV Charger'],['energySmartHome','Smart Home Systems']].map(([key, lbl]) => (
+            <Toggle key={key} on={f[key]} onChange={v => u(key, v)} label={lbl} />
+          ))}
+        </div>
+        <G2>
+          <F label="Green Certification Program">
+            <Sel val={f.greenCertification} onChange={v => u('greenCertification', v)}
+              opts={['LEED','ENERGY STAR','Green Point Rated','HERS Rated','NGBS','Other','None']} placeholder="Select" />
+          </F>
+          <F label="Other Energy Features"><Input val={f.energyOther} onChange={v => u('energyOther', v)} /></F>
+        </G2>
+        <F label="Energy Features Commentary"><Textarea val={f.energyComm} onChange={v => u('energyComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '15': () => (
+      <div>
+        <SectionHeader num="15" title="Manufactured Home" badge="MH" />
+        <ConditionalBanner text="Manufactured home — HUD compliance documentation required." />
+        <G2>
+          <F label="Manufacturer Name" req><Input val={f.mhManufacturer} onChange={v => u('mhManufacturer', v)} /></F>
+          <F label="Model Name / Year"><Input val={f.mhModel} onChange={v => u('mhModel', v)} /></F>
+          <F label="HUD Certification Tag #" req><Input val={f.mhHUDTag} onChange={v => u('mhHUDTag', v)} /></F>
+          <F label="Serial / VIN #" req><Input val={f.mhSerial} onChange={v => u('mhSerial', v)} /></F>
+          <F label="Data Plate Location"><Input val={f.mhDataPlate} onChange={v => u('mhDataPlate', v)} /></F>
+          <F label="Title Status">
+            <Sel val={f.mhTitleStatus} onChange={v => u('mhTitleStatus', v)}
+              opts={['Personal Property','Real Property','Unknown']} placeholder="Select" />
+          </F>
+          <F label="Foundation Type" req>
+            <Sel val={f.mhFoundation} onChange={v => u('mhFoundation', v)}
+              opts={['HUD Permanent Foundation','Piers','Blocking','Other']} placeholder="Select" />
+          </F>
+          <F label="Section Type">
+            <Sel val={f.mhSectionType} onChange={v => u('mhSectionType', v)}
+              opts={['Single-Wide','Double-Wide','Triple-Wide','Other']} placeholder="Select" />
+          </F>
+        </G2>
+        <F label="Manufactured Home Commentary"><Textarea val={f.mhComm} onChange={v => u('mhComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '16': () => (
+      <div>
+        <SectionHeader num="16" title="Project Information" badge="Condo" />
+        <ConditionalBanner text="Condominium project — complete all project fields. HOA financials and project classification required." />
+        <G2>
+          <F label="Project Name" req><Input val={f.projectName} onChange={v => u('projectName', v)} /></F>
+          <F label="Project Type" req>
+            <Sel val={f.projectType} onChange={v => u('projectType', v)}
+              opts={['Detached','Attached','2-4 Unit','PUD','High-Rise','Mid-Rise','Garden Style','Other']} placeholder="Select" />
+          </F>
+          <F label="Total Units in Project"><Input val={f.projectUnits} onChange={v => u('projectUnits', v)} type="number" /></F>
+          <F label="Phase #"><Input val={f.projectPhase} onChange={v => u('projectPhase', v)} /></F>
+          <F label="% Owner Occupied"><Input val={f.projectOwnerOcc} onChange={v => u('projectOwnerOcc', v)} type="number" /></F>
+          <F label="% Units Sold"><Input val={f.projectSoldPct} onChange={v => u('projectSoldPct', v)} type="number" /></F>
+          <F label="HOA Monthly Dues ($)" req><Input val={f.hoaDues} onChange={v => u('hoaDues', v)} type="number" /></F>
+          <F label="HOA Dues Include"><Input val={f.hoaFeeIncludes} onChange={v => u('hoaFeeIncludes', v)} placeholder="Insurance, Water, Trash..." /></F>
+        </G2>
+        <F label="Project Description / Commentary"><Textarea val={f.projectComm} onChange={v => u('projectComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '17': () => (
+      <div>
+        <SectionHeader num="17" title="ADU / Additional Unit" badge="ADU" />
+        <ConditionalBanner text="ADU present — document all additional units. Rental income and additional GLA must be reported separately." />
+        <G3>
+          <F label="ADU Type" req>
+            <Sel val={f.aduType} onChange={v => u('aduType', v)}
+              opts={['Attached','Detached','Garage Conversion','Basement','Junior ADU','Other']} placeholder="Select" />
+          </F>
+          <F label="ADU GLA (sq ft)" req><Input val={f.aduGLA} onChange={v => u('aduGLA', v)} type="number" /></F>
+          <F label="ADU Bedrooms"><Input val={f.aduBed} onChange={v => u('aduBed', v)} type="number" /></F>
+          <F label="ADU Baths"><Input val={f.aduBath} onChange={v => u('aduBath', v)} type="number" /></F>
+          <F label="ADU Monthly Rent ($)"><Input val={f.aduRent} onChange={v => u('aduRent', v)} type="number" /></F>
+          <F label="ADU Condition">
+            <Sel val={f.aduCondition} onChange={v => u('aduCondition', v)} opts={['C1','C2','C3','C4','C5','C6']} placeholder="Select" />
+          </F>
+        </G3>
+        <F label="ADU Commentary"><Textarea val={f.aduComm} onChange={v => u('aduComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '18': () => (
+      <div>
+        <SectionHeader num="18" title="Highest & Best Use" mandatory />
+        <G2>
+          <F label="As If Vacant" req>
+            <Sel val={f.hbuVacant} onChange={v => u('hbuVacant', v)}
+              opts={['Present Use is HBU','Other Use is HBU']} placeholder="Select" />
+          </F>
+          <F label="As Improved" req>
+            <Sel val={f.hbuImproved} onChange={v => u('hbuImproved', v)}
+              opts={['Present Use is HBU','Demolition & Redevelopment','Renovation / Conversion']} placeholder="Select" />
+          </F>
+        </G2>
+        <F label="HBU Commentary"><Textarea val={f.hbuComm} onChange={v => u('hbuComm', v)} rows={3} placeholder="Support the HBU conclusion — legally permissible, physically possible, financially feasible, maximally productive..." /></F>
+      </div>
+    ),
+
+    '19': () => (
+      <div>
+        <SectionHeader num="19" title="Subject Listing Information" mandatory />
+        <F label="Prior Listings in Last 12 Months" req>
+          <Sel val={f.priorListings} onChange={v => u('priorListings', v)} opts={['None','1','2','3+']} placeholder="Select" />
+        </F>
+        {f.priorListings && f.priorListings !== 'None' && (
+          <G3>
+            <F label="Listing Date"><Input val={f.listingDate} onChange={v => u('listingDate', v)} type="date" /></F>
+            <F label="Listing Price ($)"><Input val={f.listingPrice} onChange={v => u('listingPrice', v)} type="number" /></F>
+            <F label="Days on Market"><Input val={f.listingDays} onChange={v => u('listingDays', v)} type="number" /></F>
+          </G3>
+        )}
+        <F label="Listing Commentary"><Textarea val={f.listingComm} onChange={v => u('listingComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '20': () => (
+      <div>
+        <SectionHeader num="20" title="Prior Sale & Transfer History" mandatory />
+        <G2>
+          <F label="Prior Sale in Last 12 Months?">
+            <Sel val={f.priorSale12} onChange={v => u('priorSale12', v)} opts={['No','Yes']} />
+          </F>
+          {f.priorSale12 === 'Yes' && <>
+            <F label="Sale Date"><Input val={f.priorSale12Date} onChange={v => u('priorSale12Date', v)} type="date" /></F>
+            <F label="Sale Price ($)"><Input val={f.priorSale12Price} onChange={v => u('priorSale12Price', v)} type="number" /></F>
+          </>}
+          <F label="Prior Sale in Last 36 Months?">
+            <Sel val={f.priorSale36} onChange={v => u('priorSale36', v)} opts={['No','Yes']} />
+          </F>
+          {f.priorSale36 === 'Yes' && <>
+            <F label="Sale Date"><Input val={f.priorSale36Date} onChange={v => u('priorSale36Date', v)} type="date" /></F>
+            <F label="Sale Price ($)"><Input val={f.priorSale36Price} onChange={v => u('priorSale36Price', v)} type="number" /></F>
+          </>}
+        </G2>
+        <F label="Transfer History Commentary"><Textarea val={f.priorSaleComm} onChange={v => u('priorSaleComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '21': () => {
+      const adjFields = [
+        'Sale/Financing Concessions','Date of Sale','Location','Site','View',
+        'Design/Style','Quality','Age','Condition','Above Grade Room Count',
+        'GLA (sq ft)','Basement/Fin Rooms Below Grade','Functional Utility',
+        'Heating/Cooling','Energy Efficient Items','Garage/Carport',
+        'Porch/Patio/Deck','Pool','Other'
+      ];
+      return (
         <div>
-          <DynamicBanner label="hasAmenities = true" />
-          <SectionCard title="Subject Property Amenities" badge="CONDITIONAL">
-            <Row cols={2}>
-              <FL label="Fireplace(s)"><Row cols={2}><Select value="Yes" onChange={()=>{}} options={['Yes','No']} /><Input placeholder="Count: 1" /></Row></FL>
-              <FL label="Pool / Spa"><Select value="None" onChange={()=>{}} options={['None','Pool','Spa','Pool & Spa']} /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Patio / Deck"><Select value="Patio & Deck" onChange={()=>{}} options={['None','Patio','Deck','Patio & Deck','Covered Porch']} /></FL>
-              <FL label="Fence"><Select value="Privacy – Wood" onChange={()=>{}} options={['None','Chain Link','Privacy – Wood','Wrought Iron','Other']} /></FL>
-            </Row>
-            <FL label="Other Amenities Description"><Textarea placeholder="Describe any additional amenities that affect value…" rows={2} /></FL>
-          </SectionCard>
+          <SectionHeader num="21" title="Sales Comparison Approach" mandatory />
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse min-w-max">
+              <thead>
+                <tr className="bg-gray-800 text-white">
+                  <th className="p-2 text-left w-40">Feature</th>
+                  <th className="p-2 text-left w-48">Subject</th>
+                  {[1,2,3].map(n => <th key={n} className="p-2 text-left w-48">Comparable {n}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Address', 'address', null, 'text'],
+                  ['Prox to Subject', 'prox', null, 'text'],
+                  ['Sale Price ($)', 'salePrice', null, 'number'],
+                  ['Sale Price/GLA', 'salePriceGLA', null, 'text'],
+                  ['Data Source', 'dataSource', null, 'text'],
+                  ['Verification Source', 'verSource', null, 'text'],
+                ].map(([label, field, subjectField, type]) => (
+                  <tr key={field} className="border-b border-gray-200 even:bg-gray-50">
+                    <td className="p-2 font-semibold text-gray-600">{label}</td>
+                    <td className="p-2 text-gray-500 italic text-xs">
+                      {label === 'Address' ? f.address || '—' :
+                       label === 'Sale Price ($)' ? 'N/A' :
+                       label === 'GLA' ? (f.gla || '—') + ' sq ft' : '—'}
+                    </td>
+                    {[0,1,2].map(i => (
+                      <td key={i} className="p-2">
+                        <input type={type} className="w-full border border-gray-200 rounded px-1 py-0.5 text-xs"
+                          value={f.comps[i][field] || ''}
+                          onChange={e => uComp(i, field, e.target.value)} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                <tr className="bg-blue-50">
+                  <td colSpan="5" className="p-2 text-xs font-bold text-blue-700 uppercase">Adjustment Grid</td>
+                </tr>
+                {adjFields.map(adjField => (
+                  <tr key={adjField} className="border-b border-gray-100 even:bg-gray-50">
+                    <td className="p-2 font-medium text-gray-600 text-xs">{adjField}</td>
+                    <td className="p-2 text-xs text-gray-500 italic">
+                      {adjField === 'View' && f.viewRating ? `${f.viewRating};${f.viewFactors.join(',')}` :
+                       adjField === 'Quality' && f.qualityRating ? f.qualityRating :
+                       adjField === 'Condition' && f.conditionRating ? f.conditionRating :
+                       adjField === 'GLA (sq ft)' && f.gla ? f.gla + ' sq ft' : '—'}
+                    </td>
+                    {[0,1,2].map(i => (
+                      <td key={i} className="p-2">
+                        <input className="w-full border border-gray-200 rounded px-1 py-0.5 text-xs"
+                          value={f.comps[i][adjField.replace(/[^a-z]/gi,'_')] || ''}
+                          onChange={e => uComp(i, adjField.replace(/[^a-z]/gi,'_'), e.target.value)}
+                          placeholder="+/−" />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                <tr className="bg-green-50 font-bold">
+                  <td className="p-2 text-xs font-bold text-green-700">Adjusted Sale Price</td>
+                  <td className="p-2 text-xs text-gray-400">—</td>
+                  {[0,1,2].map(i => (
+                    <td key={i} className="p-2">
+                      <input className="w-full border border-green-300 rounded px-1 py-0.5 text-xs font-bold bg-white"
+                        value={f.comps[i].adjSalePrice || ''}
+                        onChange={e => uComp(i, 'adjSalePrice', e.target.value)}
+                        placeholder="$" />
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4">
+            <F label="Sales Comparison Approach Commentary" req>
+              <Textarea val={f.scaCommentary} onChange={v => u('scaCommentary', v)}
+                placeholder="Explain selection of comparables, adjustments, and support for SCA value conclusion..." rows={3} />
+            </F>
+            <F label="Indicated Value by Sales Comparison Approach ($)" req>
+              <Input val={f.scaValue} onChange={v => u('scaValue', v)} type="number" />
+            </F>
+          </div>
         </div>
       );
+    },
 
-      case 'vehicle': return (
-        <div>
-          <DynamicBanner label="hasVehicle = true" />
-          <SectionCard title="Vehicle Storage" badge="CONDITIONAL">
-            <Row cols={3}>
-              <FL label="Type"><Select value="Garage" onChange={()=>{}} options={['Garage','Carport','None','Parking Space']} /></FL>
-              <FL label="Attachment"><Select value="Attached" onChange={()=>{}} options={['Attached','Detached','Built-In']} /></FL>
-              <FL label="Number of Cars"><Input placeholder="2" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Garage Size (sf)"><Input placeholder="480" /></FL>
-              <FL label="Finish"><Select value="Unfinished" onChange={()=>{}} options={['Unfinished','Partially Finished','Finished']} /></FL>
-            </Row>
-          </SectionCard>
+    '22': () => (
+      <div>
+        <SectionHeader num="22" title="Rental Information" badge="Income Producing" />
+        <ConditionalBanner text="Income producing property — rental data required for Income Approach analysis." />
+        <G3>
+          <F label="Monthly Market Rent ($)" req><Input val={f.monthlyRent} onChange={v => u('monthlyRent', v)} type="number" /></F>
+          <F label="Rent Basis">
+            <Sel val={f.rentBasis} onChange={v => u('rentBasis', v)} opts={['Furnished','Unfurnished']} placeholder="Select" />
+          </F>
+          <F label="Vacancy Rate %"><Input val={f.rentVacancy} onChange={v => u('rentVacancy', v)} type="number" /></F>
+        </G3>
+        <F label="Rental Information Commentary"><Textarea val={f.rentalComm} onChange={v => u('rentalComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '23': () => (
+      <div>
+        <SectionHeader num="23" title="Income Approach" badge={is24Unit ? '2-4 Unit' : 'Income Producing'} />
+        <ConditionalBanner text="Income Approach applicable — complete all income and expense fields." />
+        <G2>
+          <F label="Potential Gross Income ($)" req><Input val={f.potentialGrossIncome} onChange={v => u('potentialGrossIncome', v)} type="number" /></F>
+          <F label="Less Vacancy & Collection Loss ($)"><Input val={f.vacancyLoss} onChange={v => u('vacancyLoss', v)} type="number" /></F>
+          <F label="Effective Gross Income ($)"><Input val={f.effectiveGrossIncome} onChange={v => u('effectiveGrossIncome', v)} type="number" /></F>
+          <F label="Less Operating Expenses ($)"><Input val={f.expenses} onChange={v => u('expenses', v)} type="number" /></F>
+          <F label="Net Operating Income ($)"><Input val={f.netOperatingIncome} onChange={v => u('netOperatingIncome', v)} type="number" /></F>
+          <F label="Capitalization Rate %"><Input val={f.capRate} onChange={v => u('capRate', v)} type="number" /></F>
+          <F label="Gross Rent Multiplier"><Input val={f.grossRentMultiplier} onChange={v => u('grossRentMultiplier', v)} type="number" /></F>
+          <F label="Indicated Value by Income Approach ($)"><Input val={f.incomeApproachValue} onChange={v => u('incomeApproachValue', v)} type="number" /></F>
+        </G2>
+        <F label="Income Approach Commentary"><Textarea val={f.incomeComm} onChange={v => u('incomeComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '24': () => (
+      <div>
+        <SectionHeader num="24" title="Cost Approach" />
+        <G3>
+          <F label="Site Value ($)" req><Input val={f.siteValue} onChange={v => u('siteValue', v)} type="number" /></F>
+          <F label="Dwelling Value ($)"><Input val={f.dwellingValue} onChange={v => u('dwellingValue', v)} type="number" /></F>
+          <F label="Depreciation ($)"><Input val={f.depreciationAmt} onChange={v => u('depreciationAmt', v)} type="number" /></F>
+          <F label="Depreciation %"><Input val={f.depreciationPct} onChange={v => u('depreciationPct', v)} type="number" /></F>
+          <F label="Improvements As-Is ($)"><Input val={f.improvementsAsIs} onChange={v => u('improvementsAsIs', v)} type="number" /></F>
+          <F label="Indicated Value by Cost Approach ($)"><Input val={f.costApproachValue} onChange={v => u('costApproachValue', v)} type="number" /></F>
+        </G3>
+        <F label="Cost Approach Commentary"><Textarea val={f.costComm} onChange={v => u('costComm', v)} rows={2} /></F>
+      </div>
+    ),
+
+    '25': () => (
+      <div>
+        <SectionHeader num="25" title="Disaster Mitigation" badge="Disaster Area" />
+        <ConditionalBanner text="Federal disaster area — document all impacts, damage, and mitigation measures." />
+        <G2>
+          <F label="Disaster Type" req>
+            <Sel val={f.disasterType} onChange={v => u('disasterType', v)}
+              opts={['Hurricane','Flood','Earthquake','Wildfire','Tornado','Other']} placeholder="Select" />
+          </F>
+          <F label="FEMA Disaster #"><Input val={f.femaNum} onChange={v => u('femaNum', v)} /></F>
+        </G2>
+        <F label="Disaster Impact Description" req>
+          <Textarea val={f.disasterDesc} onChange={v => u('disasterDesc', v)}
+            placeholder="Describe any property damage, mitigation measures completed, and impact on value..." rows={3} />
+        </F>
+      </div>
+    ),
+
+    '26': () => (
+      <div>
+        <SectionHeader num="26" title="Reconciliation" mandatory />
+        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+          <G3>
+            <F label="SCA Indicated Value ($)"><Input val={f.scaValue} onChange={v => u('scaValue', v)} type="number" /></F>
+            <F label="Cost Approach Value ($)">
+              <Input val={f.costApproachValue} onChange={v => u('costApproachValue', v)} type="number"
+                cls={!f.showCostApproach ? 'bg-gray-100 text-gray-400' : ''} />
+              {!f.showCostApproach && <p className="text-xs text-gray-400 mt-0.5">Cost Approach not included</p>}
+            </F>
+            <F label="Income Approach Value ($)">
+              <Input val={f.incomeApproachValue} onChange={v => u('incomeApproachValue', v)} type="number"
+                cls={!showIncomeApproach ? 'bg-gray-100 text-gray-400' : ''} />
+              {!showIncomeApproach && <p className="text-xs text-gray-400 mt-0.5">Income Approach not included</p>}
+            </F>
+          </G3>
         </div>
-      );
+        <F label="Reconciled Opinion of Market Value ($)" req>
+          <input type="number" className="w-full border-2 border-blue-400 rounded px-3 py-2 text-lg font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
+            value={f.reconciledValue || ''} onChange={e => u('reconciledValue', e.target.value)} placeholder="$" />
+        </F>
+        <G2>
+          <F label="Exposure Time"><Input val={f.exposureTime} onChange={v => u('exposureTime', v)} placeholder="e.g., 3-6 months" /></F>
+          <F label="Marketing Time"><Input val={f.marketingTimeFinal} onChange={v => u('marketingTimeFinal', v)} placeholder="e.g., 3-6 months" /></F>
+        </G2>
+        <F label="Reconciliation Commentary" req>
+          <Textarea val={f.reconCommentary} onChange={v => u('reconCommentary', v)}
+            placeholder="Explain weight given to each approach and support for the final value conclusion..." rows={4} />
+        </F>
+      </div>
+    ),
 
-      case 'functional': return (
-        <div>
-          <DynamicBanner label="hasFunctional = true" />
-          <SectionCard title="Functional Obsolescence" badge="CONDITIONAL">
-            <FL label="Type of Functional Obsolescence">
-              <Select value="Curable" onChange={()=>{}} options={['Curable','Incurable','Both']} />
-            </FL>
-            <FL label="Description"><Textarea placeholder="Describe the functional obsolescence and its impact on value…" rows={3} /></FL>
-            <Row cols={2}>
-              <FL label="Estimated Cost to Cure ($)"><Input placeholder="0" /></FL>
-              <FL label="Value Impact ($)"><Input placeholder="0" /></FL>
-            </Row>
-          </SectionCard>
+    '27': () => (
+      <div>
+        <SectionHeader num="27" title="Supplemental Information" mandatory />
+        <F label="Additional Comments">
+          <Textarea val={f.suppComments} onChange={v => u('suppComments', v)} rows={5}
+            placeholder="Additional commentary, explanation of atypical conditions, clarifications, or any other relevant information not captured in other sections..." />
+        </F>
+      </div>
+    ),
+
+    '28': () => (
+      <div>
+        <SectionHeader num="28" title="Certification & Scope of Work" mandatory />
+        {(isHybrid || isDesktop) && (
+          <ConditionalBanner text={`${f.valuationMethod} valuation — inspection scope must reflect the method selected in Assignment Information.`} />
+        )}
+        <G2>
+          <F label="Inspection Type" req>
+            <Sel val={f.inspectionType} onChange={v => u('inspectionType', v)}
+              opts={['Interior and Exterior','Exterior Only (Drive-By)','Desktop — No Inspection','Hybrid — Third-Party PDC']} />
+          </F>
+          <F label="Signature Date" req><Input val={f.signatureDate} onChange={v => u('signatureDate', v)} type="date" /></F>
+          <F label="Appraiser Name" req><Input val={f.appraiserName} onChange={v => u('appraiserName', v)} /></F>
+          <F label="License # / State"><Input val={f.appraiserLicense} onChange={v => u('appraiserLicense', v)} /></F>
+          <F label="Supervisory Appraiser (if applicable)"><Input val={f.supervisoryName} onChange={v => u('supervisoryName', v)} /></F>
+          <F label="Supervisory License # / State"><Input val={f.supervisoryLicense} onChange={v => u('supervisoryLicense', v)} /></F>
+        </G2>
+        <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-4">
+          <p className="text-xs text-blue-700 font-medium">UAD 3.6 Standard Certification</p>
+          <p className="text-xs text-blue-600 mt-1">By completing this report, the appraiser certifies that the statements of fact contained in this report are true and correct, and that the reported analyses, opinions, and conclusions are limited only by the reported assumptions and limiting conditions, and are the appraiser's personal, impartial, and unbiased professional analyses, opinions, and conclusions in conformity with USPAP and UAD 3.6.</p>
         </div>
-      );
-
-      case 'outbuilding': return (
-        <div>
-          <DynamicBanner label="hasOutbuilding = true" />
-          <SectionCard title="Outbuilding" badge="CONDITIONAL">
-            {[1,2].map(i => (
-              <div key={i} style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 12, color: '#2563eb', marginBottom: 8 }}>Outbuilding {i}</div>
-                <Row cols={3}>
-                  <FL label="Type"><Select value="Workshop" onChange={()=>{}} options={['Workshop','Barn','Guest House','Storage','Pool House','Greenhouse','Other']} /></FL>
-                  <FL label="Size (sf)"><Input placeholder="400" /></FL>
-                  <FL label="Year Built"><Input placeholder="2005" /></FL>
-                </Row>
-                <Row cols={2}>
-                  <FL label="Quality Rating"><Select value="Q4" onChange={()=>{}} options={['Q1','Q2','Q3','Q4','Q5','Q6']} /></FL>
-                  <FL label="Condition Rating"><Select value="C3" onChange={()=>{}} options={['C1','C2','C3','C4','C5','C6']} /></FL>
-                </Row>
-                <FL label="GBA (Gross Building Area)"><Input placeholder="400 sf" /></FL>
-              </div>
-            ))}
-          </SectionCard>
-        </div>
-      );
-
-      case 'energy': return (
-        <div>
-          <DynamicBanner label="hasEnergy = true" />
-          <SectionCard title="Energy Efficient & Green Features" badge="CONDITIONAL">
-            <Row cols={2}>
-              {['Solar Panels','Solar Water Heater','Geothermal','Wind Turbine','Battery Storage','EV Charger','Smart Thermostat','Green Certification'].map(f => (
-                <CheckRow key={f} label={f} checked={f === 'Solar Panels'} onChange={()=>{}} />
-              ))}
-            </Row>
-            <Divider />
-            <Row cols={2}>
-              <FL label="Solar Panel Ownership"><Select value="Owned" onChange={()=>{}} options={['Owned','Leased','PPA']} /></FL>
-              <FL label="System Size (kW)"><Input placeholder="8.5 kW" /></FL>
-            </Row>
-            <FL label="Green Certification Type" conditional><Input placeholder="ENERGY STAR, LEED, etc." /></FL>
-            <FL label="Energy Features Impact on Value"><Textarea placeholder="The solar PV system is owned and estimated to contribute positively to value. Market reaction…" rows={3} /></FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'project': return (
-        <div>
-          <DynamicBanner label="Property Type = Condominium" />
-          <SectionCard title="Project Information" badge="CONDITIONAL – CONDO">
-            <Row cols={2}>
-              <FL label="Project Name"><Input placeholder="Lakefront Condominiums" /></FL>
-              <FL label="Project Type"><Select value="Established" onChange={()=>{}} options={['New Construction','Established','Proposed','Under Construction']} /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="Total Units in Project"><Input placeholder="120" /></FL>
-              <FL label="Total Units Completed"><Input placeholder="120" /></FL>
-              <FL label="Total Units Sold/Rented"><Input placeholder="95" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="HOA Monthly Assessment"><Input placeholder="$350" /></FL>
-              <FL label="HOA Includes"><Input placeholder="Water, Trash, Exterior Maint." /></FL>
-            </Row>
-            <FL label="Project Phase"><Input placeholder="Phase 1 of 1" /></FL>
-            <FL label="Special Assessments / Litigation"><Textarea placeholder="No pending litigation or special assessments noted…" rows={2} /></FL>
-            <Row cols={2}>
-              <FL label="Owner-Occupancy %"><Input placeholder="72%" /></FL>
-              <FL label="Investor / Non-Owner-Occupied %"><Input placeholder="28%" /></FL>
-            </Row>
-          </SectionCard>
-        </div>
-      );
-
-      case 'mfg': return (
-        <div>
-          <DynamicBanner label="Construction Method = Manufactured" />
-          <SectionCard title="Manufactured Home" badge="CONDITIONAL">
-            <Row cols={2}>
-              <FL label="HUD Label / Certification #"><Input placeholder="HUD-XXXXXX" /></FL>
-              <FL label="Data Plate Present"><Select value="Yes" onChange={()=>{}} options={['Yes','No']} /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="Manufacturer"><Input placeholder="Clayton Homes" /></FL>
-              <FL label="Model"><Input placeholder="Freedom 2860" /></FL>
-              <FL label="Model Year"><Input placeholder="2015" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Multi-Wide"><Select value="Double Wide" onChange={()=>{}} options={['Single Wide','Double Wide','Triple Wide']} /></FL>
-              <FL label="Foundation Type"><Select value="Permanent" onChange={()=>{}} options={['Permanent','Non-Permanent']} /></FL>
-            </Row>
-            <FL label="Manufactured Home Comments"><Textarea placeholder="The manufactured home is permanently affixed to the foundation and has been titled as real property…" rows={3} /></FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'disaster': return (
-        <div>
-          <DynamicBanner label="hasDisaster = true (Disaster Area Assignment)" />
-          <SectionCard title="Disaster Mitigation" badge="CONDITIONAL">
-            <Row cols={2}>
-              <FL label="Disaster Type"><Select value="Flood" onChange={()=>{}} options={['Flood','Fire','Wind/Hurricane','Earthquake','Other']} /></FL>
-              <FL label="Disaster Date"><Input type="date" /></FL>
-            </Row>
-            <FL label="Property Damage Description"><Textarea placeholder="Describe any disaster-related damage observed…" rows={3} /></FL>
-            <Row cols={2}>
-              <FL label="Repair / Remediation Status"><Select value="Repaired" onChange={()=>{}} options={['No Damage Observed','Repaired','In Progress','Unrepaired']} /></FL>
-              <FL label="Impact on Value"><Select value="None" onChange={()=>{}} options={['None','Minor','Significant']} /></FL>
-            </Row>
-          </SectionCard>
-        </div>
-      );
-
-      case 'adu': return (
-        <div>
-          <DynamicBanner label="hasADU = true" />
-          <SectionCard title="Accessory Dwelling Unit (ADU)" badge="CONDITIONAL">
-            <Row cols={3}>
-              <FL label="ADU Type"><Select value="Attached" onChange={()=>{}} options={['Attached','Detached','Garage Conversion','Basement','JADU']} /></FL>
-              <FL label="ADU GLA (sf)"><Input placeholder="620" /></FL>
-              <FL label="ADU Bedrooms"><Input placeholder="1" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="ADU Year Built"><Input placeholder="2020" /></FL>
-              <FL label="ADU Permitted"><Select value="Yes" onChange={()=>{}} options={['Yes','No','Unknown']} /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="ADU Quality Rating"><Select value="Q4" onChange={()=>{}} options={['Q1','Q2','Q3','Q4','Q5','Q6']} /></FL>
-              <FL label="ADU Condition Rating"><Select value="C2" onChange={()=>{}} options={['C1','C2','C3','C4','C5','C6']} /></FL>
-            </Row>
-            <FL label="ADU Rental Income (market)"><Input placeholder="$1,200/mo" /></FL>
-            <FL label="ADU Comments"><Textarea placeholder="The ADU is a legally permitted detached unit constructed in 2020. It has a separate entrance and utilities…" rows={3} /></FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'listing': return (
-        <div>
-          <SectionCard title="Subject Listing Information" badge="MANDATORY">
-            <Row cols={2}>
-              <FL label="Currently Listed"><Select value="No" onChange={()=>{}} options={['Yes','No']} /></FL>
-              <FL label="MLS # / Data Source"><Input placeholder="MLS-XXXXXXX" /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="List Price ($)"><Input placeholder="0" /></FL>
-              <FL label="List Date"><Input type="date" /></FL>
-              <FL label="Days on Market"><Input placeholder="0" /></FL>
-            </Row>
-            <FL label="Listing Comments"><Textarea placeholder="The subject is not currently listed for sale…" rows={2} /></FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'prior': return (
-        <div>
-          <SectionCard title="Prior Sale & Transfer History" badge="MANDATORY">
-            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>Report all sales/transfers within the prior 3 years for the subject, and 1 year for each comparable.</div>
-            {['Prior Sale 1 (Subject)','Prior Sale 2 (Subject)'].map((label, i) => (
-              <div key={i} style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 12, color: '#374151', marginBottom: 8 }}>{label}</div>
-                <Row cols={3}>
-                  <FL label="Sale Date"><Input type="date" /></FL>
-                  <FL label="Sale Price ($)"><Input placeholder="0" /></FL>
-                  <FL label="Data Source"><Input placeholder="County Records / MLS" /></FL>
-                </Row>
-              </div>
-            ))}
-            <FL label="Prior Sale Analysis Comments"><Textarea placeholder="The subject's prior sale/transfer history has been reviewed. No arm's-length transfers were found in the prior three years…" rows={3} /></FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'market': return (
-        <div>
-          <SectionCard title="Market Conditions" badge="MANDATORY">
-            <Row cols={3}>
-              <FL label="Neighborhood Type"><Select value="Suburban" onChange={()=>{}} options={['Urban','Suburban','Rural']} /></FL>
-              <FL label="Neighborhood Built-Up %"><Select value="75-100%" onChange={()=>{}} options={['Under 25%','25-75%','75-100%']} /></FL>
-              <FL label="Growth Rate"><Select value="Stable" onChange={()=>{}} options={['Rapid','Stable','Slow','Declining']} /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="Property Values Trend"><Select value="Increasing" onChange={()=>{}} options={['Increasing','Stable','Declining']} /></FL>
-              <FL label="Demand / Supply"><Select value="In Balance" onChange={()=>{}} options={['Shortage','In Balance','Oversupply']} /></FL>
-              <FL label="Marketing Time"><Select value="Under 3 Months" onChange={()=>{}} options={['Under 3 Months','3-6 Months','Over 6 Months']} /></FL>
-            </Row>
-            <Divider />
-            <Row cols={3}>
-              <FL label="1-Unit Housing Price Range (Low)"><Input placeholder="$300,000" /></FL>
-              <FL label="1-Unit Housing Price Range (High)"><Input placeholder="$650,000" /></FL>
-              <FL label="1-Unit Price Predominant"><Input placeholder="$425,000" /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="1-Unit Housing Age Range (yrs)"><Input placeholder="5-35" /></FL>
-              <FL label="Present Land Use % 1-Unit"><Input placeholder="85%" /></FL>
-              <FL label="Present Land Use % Other"><Input placeholder="15%" /></FL>
-            </Row>
-            <FL label="Market Analysis Comments"><Textarea placeholder="The subject's neighborhood is a well-established suburban residential area. Market conditions are stable with balanced supply and demand…" rows={4} /></FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'hbu': return (
-        <div>
-          <SectionCard title="Highest & Best Use" badge="MANDATORY">
-            <Row cols={2}>
-              <FL label="As Vacant">
-                <Select value="Single-family residential" onChange={()=>{}} options={['Single-family residential','Multi-family residential','Commercial','Industrial','Other']} />
-              </FL>
-              <FL label="As Improved">
-                <Select value="Present use" onChange={()=>{}} options={['Present use','Renovation / Conversion','Demolition & Redevelopment','Other']} />
-              </FL>
-            </Row>
-            <FL label="HBU Comments"><Textarea placeholder="The highest and best use of the site as vacant is for single-family residential development, consistent with surrounding land uses and applicable zoning. The highest and best use as improved is the present use…" rows={4} /></FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'sales_comp': return (
-        <div>
-          <SectionCard title="Sales Comparison Approach" badge="MANDATORY">
-            <div style={{ fontSize: 11, color: '#64748b', background: '#f0f9ff', borderRadius: 8, padding: 10, marginBottom: 14, border: '1px solid #bae6fd' }}>
-              <strong>UAD 3.6 Dynamic Grid:</strong> The comparison grid adapts based on property type. Up to 15 subsections (General Info, Project Info, Site, Water Frontage, Dwelling(s), Quality & Condition, etc.) display when relevant.
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
-              {[0,1,2].map(i => <CompGrid key={i} idx={i} />)}
-            </div>
-            <Divider />
-            <FL label="Additional Comparables (4–6)" conditional note="(if needed)">
-              <div style={{ background: '#f8fafc', borderRadius: 8, padding: 10, fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>
-                + Add Comparable 4 / 5 / 6
-              </div>
-            </FL>
-            <Divider />
-            <FL label="Sales Comparison Summary & Reconciliation">
-              <Textarea placeholder="The three comparable sales selected are the most recent and similar properties available in the subject's market area. Adjustments have been made for differences in…" rows={5} />
-            </FL>
-            <Row cols={2}>
-              <FL label="Indicated Value by Sales Comparison ($)"><Input placeholder="$425,000" /></FL>
-              <FL label="Final Adjusted Range"><Input placeholder="$415,000 – $435,000" /></FL>
-            </Row>
-          </SectionCard>
-        </div>
-      );
-
-      case 'cost': return (
-        <div>
-          <DynamicBanner label="hasCost = true" />
-          <SectionCard title="Cost Approach" badge="CONDITIONAL">
-            <Row cols={2}>
-              <FL label="Source of Cost Data"><Input placeholder="Marshall & Swift / Local Cost Service" /></FL>
-              <FL label="Quality Rating for Cost"><Select value="Q4" onChange={()=>{}} options={['Q1','Q2','Q3','Q4','Q5','Q6']} /></FL>
-            </Row>
-            <Divider />
-            <FL label="Estimated Site Value ($)"><Input placeholder="75,000" /></FL>
-            <Row cols={2}>
-              <FL label="Dwelling – Reproduction / Replacement Cost New ($)"><Input placeholder="280,000" /></FL>
-              <FL label="Dwelling – Sq Ft × Cost/sf"><Row cols={2}><Input placeholder="2,340 sf" /><Input placeholder="× $120/sf" /></Row></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="Dwellings – Other ($)"><Input placeholder="0" /></FL>
-              <FL label="Garage / Carport ($)"><Input placeholder="12,000" /></FL>
-              <FL label="Other Improvements ($)"><Input placeholder="5,000" /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="Total Estimated Cost New ($)"><Input placeholder="297,000" /></FL>
-              <FL label="Less Physical Depreciation ($)"><Input placeholder="(44,550)" /></FL>
-              <FL label="Less Functional Depreciation ($)" conditional><Input placeholder="0" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Less External Depreciation ($)" conditional><Input placeholder="0" /></FL>
-              <FL label="Depreciated Value of Improvements ($)"><Input placeholder="252,450" /></FL>
-            </Row>
-            <FL label="Indicated Value by Cost Approach ($)">
-              <Input placeholder="$327,450" />
-            </FL>
-            <FL label="Cost Approach Comments"><Textarea placeholder="The cost approach has been developed to support the sales comparison approach. Depreciation was estimated using the age-life method…" rows={3} /></FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'income': return (
-        <div>
-          <DynamicBanner label="hasIncome = true" />
-          <SectionCard title="Income Approach" badge="CONDITIONAL">
-            <Row cols={3}>
-              <FL label="Estimated Monthly Market Rent ($)"><Input placeholder="2,400" /></FL>
-              <FL label="× Gross Rent Multiplier (GRM)"><Input placeholder="175" /></FL>
-              <FL label="= Indicated Value ($)"><Input placeholder="$420,000" /></FL>
-            </Row>
-            <FL label="Rental Survey / Comparable Rentals">
-              <Textarea placeholder="Three comparable rentals were analyzed ranging from $2,200 to $2,600/month. The subject's market rent is estimated at $2,400/month…" rows={3} />
-            </FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'rental': return (
-        <div>
-          <DynamicBanner label="hasRental = true" />
-          <SectionCard title="Rental Information" badge="CONDITIONAL">
-            <Row cols={2}>
-              <FL label="Current Rent ($)"><Input placeholder="2,200" /></FL>
-              <FL label="Lease Expiration"><Input type="date" /></FL>
-            </Row>
-            <FL label="Rental Comments"><Textarea placeholder="The subject is currently tenant-occupied under a month-to-month lease…" rows={2} /></FL>
-          </SectionCard>
-        </div>
-      );
-
-      case 'reconciliation': return (
-        <div>
-          <SectionCard title="Reconciliation" badge="MANDATORY">
-            <Row cols={3}>
-              <FL label="Sales Comparison Approach ($)"><Input placeholder="$425,000" /></FL>
-              <FL label="Cost Approach ($)" note="(if developed)"><Input placeholder="$327,450" /></FL>
-              <FL label="Income Approach ($)" note="(if developed)"><Input placeholder="N/A" /></FL>
-            </Row>
-            <FL label="Final Opinion of Value ($)">
-              <input style={{ width: '100%', border: '2px solid #2563eb', borderRadius: 8, padding: '10px 12px', fontSize: 16, fontWeight: 700, color: '#2563eb', background: '#eff6ff', boxSizing: 'border-box' }} placeholder="$425,000" />
-            </FL>
-            <Row cols={2}>
-              <FL label="Effective Date of Appraisal"><Input type="date" /></FL>
-              <FL label="Prospective / Retrospective Value"><Select value="Current (As of Effective Date)" onChange={()=>{}} options={['Current (As of Effective Date)','Prospective','Retrospective']} /></FL>
-            </Row>
-            <FL label="Reconciliation Narrative">
-              <Textarea placeholder="The sales comparison approach is given most weight in this analysis as it best reflects the actions of buyers and sellers in this market. The final opinion of value is $425,000, as of the effective date of appraisal…" rows={5} />
-            </FL>
-            <Divider />
-            <SectionCard title="Market Value Definition">
-              <div style={{ fontSize: 11, color: '#475569', lineHeight: 1.7, background: '#f8fafc', borderRadius: 8, padding: 12 }}>
-                The most probable price which a property should bring in a competitive and open market under all conditions requisite to a fair sale, the buyer and seller each acting prudently and knowledgeably, and assuming the price is not affected by undue stimulus.
-              </div>
-            </SectionCard>
-          </SectionCard>
-        </div>
-      );
-
-      case 'certification': return (
-        <div>
-          <SectionCard title="Certification & Scope of Work" badge="MANDATORY">
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 12, fontSize: 11, color: '#166534', lineHeight: 1.8, marginBottom: 16 }}>
-              I certify that, to the best of my knowledge and belief:<br/>
-              • The statements of fact contained in this report are true and correct.<br/>
-              • The reported analyses, opinions, and conclusions are limited only by the reported assumptions and limiting conditions, and are my personal, impartial, and unbiased professional analyses, opinions, and conclusions.<br/>
-              • I have no present or prospective interest in the property and no personal interest with respect to the parties involved.<br/>
-              • I have performed no services, as an appraiser or in any other capacity, regarding the property that is the subject of this report within the three-year period immediately preceding acceptance of this assignment.<br/>
-              • My compensation for completing this assignment is not contingent upon the development or reporting of a predetermined value or direction in value that favors the cause of the client.
-            </div>
-            <Row cols={2}>
-              <FL label="Appraiser Signature"><Input placeholder="Digital signature" /></FL>
-              <FL label="Date Signed"><Input type="date" /></FL>
-            </Row>
-            <Row cols={3}>
-              <FL label="Appraiser Name (Print)"><Input placeholder="Full name" /></FL>
-              <FL label="License #"><Input placeholder="CR-XXXXXXX" /></FL>
-              <FL label="License State"><Input placeholder="TX" /></FL>
-            </Row>
-            <Row cols={2}>
-              <FL label="Inspection Date"><Input type="date" /></FL>
-              <FL label="Report Date"><Input type="date" /></FL>
-            </Row>
-            <Divider />
-            <SectionCard title="Supervisory Appraiser" badge="CONDITIONAL">
-              <Row cols={2}>
-                <FL label="Supervisory Appraiser Name" conditional><Input placeholder="If applicable" /></FL>
-                <FL label="Supervisory License #" conditional><Input placeholder="CR-XXXXXXX" /></FL>
-              </Row>
-              <FL label="Supervisory Inspection of Subject Property" conditional>
-                <Select value="Interior & Exterior" onChange={()=>{}} options={['Interior & Exterior','Exterior Only','Did Not Inspect']} />
-              </FL>
-            </SectionCard>
-            <Divider />
-            <SectionCard title="UCDP Submission">
-              <Row cols={2}>
-                <FL label="UCDP Doc File ID"><Input placeholder="Pending submission" /></FL>
-                <FL label="Submission Status"><Select value="Pending" onChange={()=>{}} options={['Pending','Submitted','Accepted','Revision Required']} /></FL>
-              </Row>
-            </SectionCard>
-          </SectionCard>
-        </div>
-      );
-
-      default: return <div style={{ color: '#94a3b8', fontSize: 13, padding: 20 }}>Section coming soon.</div>;
-    }
+      </div>
+    ),
   };
 
-  const conditional = [
-    { key: 'hasAmenities',   label: 'Subject Amenities',     val: hasAmenities,   set: setHasAmenities   },
-    { key: 'hasVehicle',     label: 'Vehicle Storage',       val: hasVehicle,     set: setHasVehicle     },
-    { key: 'hasADU',         label: 'ADU Present',           val: hasADU,         set: setHasADU         },
-    { key: 'hasOutbuilding', label: 'Outbuilding',           val: hasOutbuilding, set: setHasOutbuilding },
-    { key: 'hasEnergy',      label: 'Energy / Green',        val: hasEnergy,      set: setHasEnergy      },
-    { key: 'hasFunctional',  label: 'Functional Obsol.',     val: hasFunctional,  set: setHasFunctional  },
-    { key: 'hasCost',        label: 'Cost Approach',         val: hasCost,        set: setHasCost        },
-    { key: 'hasIncome',      label: 'Income Approach',       val: hasIncome,      set: setHasIncome      },
-    { key: 'hasRental',      label: 'Rental Info',           val: hasRental,      set: setHasRental      },
-    { key: 'hasDisaster',    label: 'Disaster Mitigation',   val: hasDisaster,    set: setHasDisaster    },
-  ];
-
-  const completedCount = visibleSections.length;
+  const currentSection = sections.find(s => s.id === activeSection);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: 13, background: '#f8fafc', overflow: 'hidden' }}>
+    <div className="flex h-screen bg-white font-sans text-gray-800 overflow-hidden">
 
       {/* Toast */}
-      {savedToast && (
-        <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 999, background: '#16a34a', color: 'white', padding: '10px 18px', borderRadius: 8, fontWeight: 600, fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-          ✓ Section saved to report
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-red-600 text-white text-xs px-4 py-2 rounded shadow-lg">
+          {toast}
         </div>
       )}
 
       {/* Left Nav */}
-      <div style={{ width: navOpen ? 220 : 0, background: '#0f172a', color: 'white', flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'width 0.2s' }}>
-        <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #1e293b' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <div style={{ width: 28, height: 28, background: '#3b82f6', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11, flexShrink: 0 }}>TF</div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 12 }}>True Footage</div>
-              <div style={{ fontSize: 9, color: '#64748b' }}>UAD 3.6 Dynamic URAR</div>
-            </div>
-          </div>
-          <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6 }}>Sections active: <strong style={{ color: '#60a5fa' }}>{completedCount} / {SECTIONS.length}</strong></div>
-          <div style={{ background: '#1e293b', borderRadius: 99, height: 4 }}>
-            <div style={{ width: `${(completedCount/SECTIONS.length)*100}%`, height: 4, borderRadius: 99, background: '#3b82f6' }}></div>
-          </div>
+      <div className="w-56 bg-gray-900 text-white flex flex-col flex-shrink-0 overflow-y-auto">
+        <div className="p-3 border-b border-gray-700">
+          <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">True Footage</p>
+          <p className="text-xs text-gray-400">UAD 3.6 Dynamic URAR</p>
         </div>
-
-        {/* Dynamic section toggles */}
-        <div style={{ padding: '10px 10px 6px', borderBottom: '1px solid #1e293b' }}>
-          <div style={{ fontSize: 9, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>⚡ Dynamic Sections</div>
-          {conditional.map(c => (
-            <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 4 }}>
-              <input type="checkbox" checked={c.val} onChange={e => c.set(e.target.checked)} style={{ accentColor: '#3b82f6', width: 12, height: 12 }} />
-              <span style={{ fontSize: 10, color: c.val ? '#93c5fd' : '#64748b' }}>{c.label}</span>
-            </label>
-          ))}
-          <div style={{ marginTop: 6 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 2 }}>
-              <input type="checkbox" checked={isCondo} onChange={e => setPropType(e.target.checked ? 'Condominium' : 'Single Family')} style={{ accentColor: '#3b82f6', width: 12, height: 12 }} />
-              <span style={{ fontSize: 10, color: isCondo ? '#93c5fd' : '#64748b' }}>Condo (Project Info)</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-              <input type="checkbox" checked={isMfg} onChange={e => setConstrMethod(e.target.checked ? 'Manufactured' : 'Site Built')} style={{ accentColor: '#3b82f6', width: 12, height: 12 }} />
-              <span style={{ fontSize: 10, color: isMfg ? '#93c5fd' : '#64748b' }}>Manufactured Home</span>
-            </label>
-          </div>
+        <div className="flex-1 overflow-y-auto py-2">
+          {sections.map(s => {
+            if (!s.show) return null;
+            const isActive = activeSection === s.id;
+            return (
+              <button key={s.id} onClick={() => setActiveSection(s.id)}
+                className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
+                <span className="font-mono text-gray-500 text-xs w-5">{s.id}</span>
+                <span className="leading-tight">{s.label}</span>
+              </button>
+            );
+          })}
         </div>
-
-        {/* Section list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '6px 6px' }}>
-          {visibleSections.map(s => (
-            <button key={s.id} onClick={() => setActiveSection(s.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', textAlign: 'left', marginBottom: 1, background: activeSection === s.id ? '#2563eb' : 'transparent', color: activeSection === s.id ? 'white' : '#94a3b8' }}>
-              <span style={{ fontSize: 8, color: s.mandatory ? '#34d399' : '#fbbf24', flexShrink: 0 }}>●</span>
-              <span style={{ fontSize: 11, fontWeight: activeSection === s.id ? 700 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        <div style={{ padding: 8, borderTop: '1px solid #1e293b', fontSize: 9, color: '#334155', textAlign: 'center' }}>
-          <span style={{ color: '#34d399' }}>●</span> Mandatory   <span style={{ color: '#fbbf24' }}>●</span> Conditional
+        <div className="p-3 border-t border-gray-700 text-xs text-gray-500">
+          {visible.length} / {sections.length} sections active
         </div>
       </div>
 
-      {/* Main area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Header */}
-        <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button onClick={() => setNavOpen(!navOpen)} style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 12, color: '#475569' }}>☰</button>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>
-                {visibleSections.find(s => s.id === activeSection)?.label || 'UAD 3.6 Report'}
-              </div>
-              <div style={{ fontSize: 10, color: '#94a3b8' }}>
-                4812 Ridgecrest Blvd, Austin TX 78745 · TF-2240
-                {visibleSections.find(s=>s.id===activeSection)?.mandatory === false && <span style={{ marginLeft: 8, background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: 3, fontWeight: 600, fontSize: 9 }}>DYNAMIC SECTION</span>}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: '4px 10px', fontSize: 10, color: '#1d4ed8', fontWeight: 600 }}>
-              ● UAD 3.6 · {ovQ} / {ovC}
-            </div>
-            <button onClick={save} style={{ background: '#2563eb', color: 'white', border: 'none', padding: '6px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              Save Section
-            </button>
-          </div>
-        </div>
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto p-6">
+          {content[activeSection] ? content[activeSection]() : (
+            <div className="text-gray-400 text-sm">Section content coming soon.</div>
+          )}
 
-        {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-          {renderSection(activeSection)}
-
-          {/* Prev / Next */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+          {/* Navigation Buttons */}
+          <div className="flex justify-between mt-8 pt-4 border-t border-gray-200">
             <button
               onClick={() => {
-                const idx = visibleSections.findIndex(s => s.id === activeSection);
-                if (idx > 0) setActiveSection(visibleSections[idx-1].id);
+                const idx = visible.findIndex(s => s.id === activeSection);
+                if (idx > 0) setActiveSection(visible[idx - 1].id);
               }}
-              style={{ padding: '8px 18px', border: '1px solid #e2e8f0', borderRadius: 8, background: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#475569' }}>
+              disabled={visible.findIndex(s => s.id === activeSection) === 0}
+              className="px-4 py-2 text-sm bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40">
               ← Previous
             </button>
+            <span className="text-xs text-gray-400 self-center">
+              {visible.findIndex(s => s.id === activeSection) + 1} of {visible.length}
+            </span>
             <button
               onClick={() => {
-                const idx = visibleSections.findIndex(s => s.id === activeSection);
-                if (idx < visibleSections.length - 1) setActiveSection(visibleSections[idx+1].id);
-                else save();
+                const idx = visible.findIndex(s => s.id === activeSection);
+                if (idx < visible.length - 1) setActiveSection(visible[idx + 1].id);
               }}
-              style={{ padding: '8px 18px', background: '#2563eb', border: 'none', borderRadius: 8, color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              {visibleSections.findIndex(s => s.id === activeSection) < visibleSections.length - 1 ? 'Next →' : 'Submit Report'}
+              disabled={visible.findIndex(s => s.id === activeSection) === visible.length - 1}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-40">
+              Next →
             </button>
           </div>
         </div>
