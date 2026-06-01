@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 
 export default App;
 
+const { useState, useEffect } = React;
 
 // ── Shared UI primitives ──────────────────────────────────────────────────────
 const Input = ({ val, onChange, placeholder, type = 'text', cls = '' }) => (
